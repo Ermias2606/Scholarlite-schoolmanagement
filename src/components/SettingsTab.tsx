@@ -14,12 +14,15 @@ import {
   History,
   ShieldCheck,
   Award,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { AppData, Settings, UserProfile } from '../types';
 import { exportBackupJSON, parseAndValidateBackupJSON } from '../utils/storage';
 import { DEFAULT_APP_DATA } from '../utils/defaultData';
 import { StaffManagementSection } from './StaffManagementSection';
 import { AuditLogSection } from './AuditLogSection';
+import { useTheme } from '../utils/theme';
 
 interface SettingsTabProps {
   appData: AppData;
@@ -43,6 +46,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onAddAuditLog,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'config' | 'staff' | 'audit'>('config');
+  const { theme, toggleTheme } = useTheme();
 
   const [schoolName, setSchoolName] = useState(appData.settings.name);
   const [academicYear, setAcademicYear] = useState(appData.settings.academicYear);
@@ -548,6 +552,33 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <span>Add Slogan</span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Application Preferences */}
+          <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-xs p-6 sm:p-7">
+            <div className="flex items-center gap-2 pb-4 border-b border-gray-100 dark:border-gray-700 text-[#003366] dark:text-blue-400 font-bold text-base">
+              {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5 text-amber-500" />}
+              <span>Application Preferences</span>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-gray-800 dark:text-gray-100">Dark Mode</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Toggle between light and dark themes</p>
+              </div>
+              <button
+                onClick={toggleTheme}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 

@@ -33,7 +33,7 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
   const [password, setPassword] = useState('');
   const [title, setTitle] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(['class_teacher']);
-  const [assignedClassId, setAssignedClassId] = useState<string>(classes[0]?.id || '');
+  const [assignedClassIds, setAssignedClassIds] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
   // Collect all unique subjects across all classes
@@ -65,7 +65,7 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
       setPassword(user.password || '');
       setTitle(user.title || '');
       setSelectedRoles(user.roles || [user.role]);
-      setAssignedClassId(user.assignedClassId || classes[0]?.id || '');
+      setAssignedClassIds(user.assignedClassIds || (user.assignedClassId ? [user.assignedClassId] : []));
       setSelectedSubjects(user.assignedSubjects || []);
     } else {
       setEditingUserId(null);
@@ -74,7 +74,7 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
       setPassword('');
       setTitle('');
       setSelectedRoles(['class_teacher']);
-      setAssignedClassId(classes[0]?.id || '');
+      setAssignedClassIds(classes[0]?.id ? [classes[0].id] : []);
       setSelectedSubjects([]);
     }
     setIsFormOpen(true);
@@ -101,7 +101,7 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
       role: primaryRole,
       roles: selectedRoles,
       title: title.trim() || `${primaryRole === 'admin' ? 'Administrator' : primaryRole === 'class_teacher' ? 'Class Teacher' : 'Subject Teacher'}`,
-      assignedClassId: selectedRoles.includes('admin') ? undefined : assignedClassId,
+      assignedClassIds: selectedRoles.includes('admin') && !selectedRoles.includes('class_teacher') ? undefined : assignedClassIds,
       assignedSubjects: selectedRoles.includes('subject_teacher') ? selectedSubjects : undefined,
     };
 
@@ -272,22 +272,36 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
               </div>
             </div>
 
-            {!selectedRoles.includes('admin') && selectedRoles.includes('class_teacher') && (
+            {selectedRoles.includes('class_teacher') && (
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Assigned Class Cohort (for Class Teacher role)
+                  Assigned Class Cohorts (for Class Teacher role)
                 </label>
-                <select
-                  value={assignedClassId}
-                  onChange={(e) => setAssignedClassId(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#00A896] outline-none"
-                >
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {classes.map((c) => {
+                    const isChecked = assignedClassIds.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setAssignedClassIds(prev => 
+                            prev.includes(c.id) 
+                              ? prev.filter(id => id !== c.id)
+                              : [...prev, c.id]
+                          );
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                          isChecked
+                            ? 'bg-[#00A896] text-white border-[#00A896]'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {c.name} {isChecked && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -351,8 +365,8 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {users.map((u) => {
-              const assignedClass = classes.find((c) => c.id === u.assignedClassId);
               const displayRoles = u.roles || [u.role];
+              const assignedClasses = classes.filter(c => u.assignedClassIds?.includes(c.id) || c.id === u.assignedClassId);
               return (
                 <tr key={u.id} className="hover:bg-gray-50/50 transition">
                   <td className="py-3.5 px-4">
@@ -385,8 +399,8 @@ export const StaffManagementSection: React.FC<StaffManagementSectionProps> = ({
                       <span className="font-semibold text-amber-700">All Classes &amp; School</span>
                     ) : (
                       <div>
-                        {assignedClass && displayRoles.includes('class_teacher') && (
-                          <div className="font-semibold text-gray-800">{assignedClass.name}</div>
+                        {assignedClasses.length > 0 && displayRoles.includes('class_teacher') && (
+                          <div className="font-semibold text-gray-800">{assignedClasses.map(c => c.name).join(', ')}</div>
                         )}
                         {u.assignedSubjects && u.assignedSubjects.length > 0 && displayRoles.includes('subject_teacher') && (
                           <div className="text-gray-500 mt-0.5">

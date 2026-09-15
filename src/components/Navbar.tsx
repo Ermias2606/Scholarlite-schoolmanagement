@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogOut, Wifi, WifiOff, Menu, X, ShieldCheck, GraduationCap, BookOpen, UserCheck, RefreshCw } from 'lucide-react';
 import { AppData, UserProfile } from '../types';
+import { StudentSmartSearch } from './StudentSmartSearch';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
@@ -65,7 +66,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         )}
-
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg border border-[#FFC300] bg-white p-1 flex items-center justify-center shadow-xs">
             <img
@@ -91,6 +91,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Global Student Smart Search for Staff */}
+      {currentUser.role !== 'student' && (
+        <div className="hidden lg:flex flex-1 justify-center px-6">
+          <StudentSmartSearch appData={appData} />
+        </div>
+      )}
 
       <div className="flex items-center gap-2 sm:gap-3">
         {/* User Role Badge & Switcher */}

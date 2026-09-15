@@ -69,10 +69,10 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
 
   // If user is a class teacher, prioritize their assigned class
   const isAdmin = !currentUser || currentUser.role === 'admin';
-  const assignedClassId = currentUser?.role === 'class_teacher' ? currentUser.assignedClassId : undefined;
+  const isClassTeacher = currentUser?.role === 'class_teacher';
   
-  const visibleClasses = assignedClassId
-    ? classes.filter((c) => c.id === assignedClassId)
+  const visibleClasses = isClassTeacher
+    ? classes.filter((c) => currentUser?.assignedClassIds?.includes(c.id) || c.id === currentUser?.assignedClassId)
     : classes;
 
   const activeClass =
@@ -179,6 +179,7 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
       return (
         s.name.toLowerCase().includes(q) ||
         s.rollNo.toString().includes(q) ||
+        (s.admissionNumber || '').toLowerCase().includes(q) ||
         s.gender.toLowerCase().includes(q)
       );
     })
@@ -512,7 +513,7 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by name, roll, gender..."
+                    placeholder="Search by name, admission no..."
                     className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs outline-none focus:border-[#00A896]"
                   />
                 </div>
@@ -527,6 +528,7 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                   <thead>
                     <tr className="bg-gray-50 text-[#003366] text-xs font-bold uppercase tracking-wider border-b border-gray-200">
                       <th className="py-3 px-4 w-20 text-center">Roll No</th>
+                      <th className="py-3 px-4 w-32">Unique ID</th>
                       <th className="py-3 px-4">Student Name</th>
                       <th className="py-3 px-4 text-center">Gender</th>
                       <th className="py-3 px-4 text-right">Actions</th>
@@ -535,7 +537,7 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                   <tbody className="divide-y divide-gray-100">
                     {filteredStudents.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-8 text-center text-gray-400 text-sm">
+                        <td colSpan={5} className="py-8 text-center text-gray-400 text-sm">
                           {activeClass.students.length === 0
                             ? 'No students enrolled yet. Add a student or upload a CSV above.'
                             : 'No students matched your search.'}
@@ -546,6 +548,9 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                         <tr key={s.id} className="hover:bg-gray-50/50 transition">
                           <td className="py-3 px-4 text-center font-extrabold text-[#003366]">
                             #{s.rollNo}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-xs font-medium text-gray-500">
+                            {s.admissionNumber || '-'}
                           </td>
                           <td className="py-3 px-4 font-semibold text-gray-900">{s.name}</td>
                           <td className="py-3 px-4 text-center">

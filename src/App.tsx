@@ -8,6 +8,8 @@ import {
   Users,
   ShieldCheck,
   UserCheck,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import {
   AppData,
@@ -32,15 +34,18 @@ import { ResultsTab } from './components/ResultsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { StudentPortal } from './components/StudentPortal';
 import { CalendarTab } from './components/CalendarTab';
+import { TeacherDashboardTab } from './components/TeacherDashboardTab';
 import { Calendar } from 'lucide-react';
 import { RoleSwitcherModal } from './components/RoleSwitcherModal';
 import { EditRemarksAttendanceModal } from './components/EditRemarksAttendanceModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { useTheme } from './utils/theme';
 
 export default function App() {
+  useTheme(); // Initialize global theme on app load
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
-  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'teacher_dashboard' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // Role and User state
@@ -115,6 +120,7 @@ export default function App() {
   });
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
   const [editingRemarksStudent, setEditingRemarksStudent] = useState<{
     student: Student;
@@ -291,6 +297,12 @@ export default function App() {
   };
 
   // --- Handlers for Students ---
+  const generateAdmissionNumber = () => {
+    const year = new Date().getFullYear();
+    const randomCode = Math.floor(100000 + Math.random() * 900000);
+    return `SL-${year}-${randomCode}`;
+  };
+
   const handleAddStudent = (
     classId: string,
     student: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }
@@ -300,6 +312,7 @@ export default function App() {
         if (c.id !== classId) return c;
         const newStu = {
           id: generateId('stu'),
+          admissionNumber: generateAdmissionNumber(),
           rollNo: student.rollNo,
           name: student.name,
           gender: student.gender,
@@ -351,6 +364,7 @@ export default function App() {
         if (c.id !== classId) return c;
         const formatted = newStudents.map((s) => ({
           id: generateId('stu'),
+          admissionNumber: generateAdmissionNumber(),
           rollNo: s.rollNo,
           name: s.name,
           gender: s.gender,
@@ -485,6 +499,7 @@ export default function App() {
   // Define tab navigation based on current role permissions
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: Home, roles: ['admin', 'class_teacher', 'subject_teacher'] },
+    { id: 'teacher_dashboard', label: 'Teacher Dashboard', icon: UserCheck, roles: ['class_teacher', 'subject_teacher'] },
     { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['admin', 'class_teacher', 'subject_teacher'] },
     { id: 'classes', label: 'Classes & Students', icon: GraduationCap, roles: ['admin', 'class_teacher', 'subject_teacher'] },
     { id: 'results', label: 'Results & Reports', icon: FileSpreadsheet, roles: ['admin', 'class_teacher', 'subject_teacher'] },
@@ -537,10 +552,21 @@ export default function App() {
         ) : (
           <>
             {/* Sidebar for Desktop */}
-            <aside className="hidden md:flex w-64 bg-[#003366] text-white flex-col justify-between py-6 px-3 flex-shrink-0 no-print">
+            <aside className={`hidden md:flex bg-[#003366] text-white flex-col justify-between py-6 flex-shrink-0 transition-all duration-300 no-print ${isSidebarCollapsed ? 'w-20 px-2' : 'w-64 px-3'}`}>
               <div className="space-y-1">
-                <div className="px-3 pb-3 text-xs font-bold uppercase tracking-wider text-white/40">
-                  Navigation Menu
+                <div className="flex items-center justify-between px-3 pb-3">
+                  {!isSidebarCollapsed && (
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/40">
+                      Navigation
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    className="p-1 rounded-md hover:bg-white/10 text-white/40 hover:text-white transition-colors mx-auto"
+                    title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                  >
+                    {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+                  </button>
                 </div>
                 {navItems.map((item) => {
                   const Icon = item.icon;
@@ -549,22 +575,25 @@ export default function App() {
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id as any)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-semibold text-sm transition cursor-pointer ${
+                      title={isSidebarCollapsed ? item.label : undefined}
+                      className={`w-full flex items-center gap-3 py-3 rounded-xl font-semibold text-sm transition cursor-pointer ${
+                        isSidebarCollapsed ? 'justify-center px-0' : 'px-3.5'
+                      } ${
                         isActive
                           ? 'bg-[#00A896] text-white shadow-sm'
                           : 'text-white/80 hover:bg-white/10 hover:text-white'
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
-                      <span>{item.label}</span>
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <span>{item.label}</span>}
                     </button>
                   );
                 })}
               </div>
 
               {/* Sidebar Footer */}
-              <div className="pt-6 border-t border-white/10 px-3 text-xs text-white/50 space-y-1">
-                <div className="font-semibold text-white/80 truncate">{appData.settings.name}</div>
+              <div className={`pt-6 border-t border-white/10 px-3 space-y-1 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                <div className="font-semibold text-white/80 text-xs truncate">{appData.settings.name}</div>
                 <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span>Offline Storage Active</span>
@@ -638,6 +667,14 @@ export default function App() {
                     currentUser={currentUser}
                     onNavigateTab={(tab) => setActiveTab(tab as any)}
                     onSelectClass={(id) => setSelectedClassId(id)}
+                  />
+                )}
+
+                {activeTab === 'teacher_dashboard' && (
+                  <TeacherDashboardTab
+                    appData={appData}
+                    currentUser={currentUser}
+                    onNavigateTab={(tab) => setActiveTab(tab as any)}
                   />
                 )}
 

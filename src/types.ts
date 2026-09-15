@@ -1,5 +1,6 @@
 export interface AssessmentComponent {
   id: string;
+  admissionNumber?: string;
   name: string;
   maxScore: number;
 }
@@ -27,6 +28,7 @@ export interface StudentRemarks {
 
 export interface Student {
   id: string;
+  admissionNumber?: string;
   rollNo: number;
   name: string;
   gender: 'Male' | 'Female' | 'Other';
@@ -40,6 +42,7 @@ export interface Student {
 
 export interface SchoolClass {
   id: string;
+  admissionNumber?: string;
   name: string;
   levelId?: string;
   subjects: Subject[];
@@ -50,6 +53,7 @@ export type UserRole = 'admin' | 'class_teacher' | 'subject_teacher' | 'student'
 
 export interface UserProfile {
   id: string;
+  admissionNumber?: string;
   name: string;
   role: UserRole; // Primary role
   roles?: UserRole[]; // All assigned roles
@@ -58,12 +62,14 @@ export interface UserProfile {
   email?: string;
   title?: string;
   assignedClassId?: string;
+  assignedClassIds?: string[];
   assignedSubjects?: string[];
   assignedStudentId?: string;
 }
 
 export interface AuditLog {
   id: string;
+  admissionNumber?: string;
   timestamp: string;
   user: string;
   role: UserRole;
@@ -91,6 +97,7 @@ export type EventType = 'holiday' | 'exam' | 'event';
 
 export interface SchoolEvent {
   id: string;
+  admissionNumber?: string;
   title: string;
   date: string; // YYYY-MM-DD
   endDate?: string; // YYYY-MM-DD
@@ -100,6 +107,7 @@ export interface SchoolEvent {
 
 export interface SchoolLevel {
   id: string;
+  admissionNumber?: string;
   name: string;
   order: number;
 }
@@ -180,6 +188,7 @@ export interface SubjectTrend {
 
 export interface StudentPerformanceTrend {
   id: string;
+  admissionNumber?: string;
   rollNo: number;
   name: string;
   gender: 'Male' | 'Female' | 'Other';

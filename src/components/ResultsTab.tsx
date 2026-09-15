@@ -40,8 +40,8 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
 
   // Filter classes based on role
   const isClassTeacher = currentUser?.role === 'class_teacher';
-  const visibleClasses = isClassTeacher && currentUser?.assignedClassId
-    ? classes.filter((c) => c.id === currentUser.assignedClassId)
+  const visibleClasses = isClassTeacher
+    ? classes.filter((c) => currentUser?.assignedClassIds?.includes(c.id) || c.id === currentUser?.assignedClassId)
     : classes;
 
   const [selectedClassId, setSelectedClassId] = useState<string>(

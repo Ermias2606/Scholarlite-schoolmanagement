@@ -38,8 +38,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   // Filter classes if user is a class teacher
   const visibleClasses =
-    currentUser.role === 'class_teacher' && currentUser.assignedClassId
-      ? classes.filter((c) => c.id === currentUser.assignedClassId)
+    currentUser.role === 'class_teacher'
+      ? classes.filter((c) => currentUser.assignedClassIds?.includes(c.id) || c.id === currentUser.assignedClassId)
       : classes;
 
   const totalClasses = visibleClasses.length;
