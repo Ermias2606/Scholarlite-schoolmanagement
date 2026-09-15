@@ -46,6 +46,7 @@ export default function App() {
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
   const [activeTab, setActiveTab] = useState<'overview' | 'teacher_dashboard' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // Role and User state
@@ -67,8 +68,9 @@ export default function App() {
       setIsAuthLoading(true);
       if (user) {
         // User logged in via Firebase
-        const data = await loadAppDataFromCloud();
+        const { data, success } = await loadAppDataFromCloud();
         setAppData(data);
+        if (success) setLastSyncTime(new Date());
         
         // Find existing user by email or UID
         let profile = data.users?.find((u) => u.email === user.email || u.id === user.uid);
@@ -84,7 +86,8 @@ export default function App() {
             email: user.email || '',
           };
           data.users = [...(data.users || []), profile];
-          await saveAppDataToCloud(data);
+          const saveSuccess = await saveAppDataToCloud(data);
+          if (saveSuccess) setLastSyncTime(new Date());
           setAppData(data);
         }
         
@@ -133,7 +136,9 @@ export default function App() {
       const next = updater(prev);
       saveAppData(next); // Local backup
       if (auth.currentUser) {
-        saveAppDataToCloud(next); // Cloud sync
+        saveAppDataToCloud(next).then(success => {
+          if (success) setLastSyncTime(new Date());
+        });
       }
       return next;
     });
@@ -525,6 +530,7 @@ export default function App() {
       <Navbar
         appData={appData}
         currentUser={currentUser}
+        lastSyncTime={lastSyncTime}
         onLogout={() => {
           if (auth.currentUser) {
             signOut(auth);

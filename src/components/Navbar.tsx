@@ -1,13 +1,17 @@
 import React from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { LogOut, Wifi, WifiOff, Menu, X, ShieldCheck, GraduationCap, BookOpen, UserCheck, RefreshCw } from 'lucide-react';
 import { AppData, UserProfile } from '../types';
 import { StudentSmartSearch } from './StudentSmartSearch';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
+import { formatDistanceToNow } from 'date-fns';
+
 interface NavbarProps {
   appData: AppData;
   currentUser: UserProfile;
+  lastSyncTime?: Date | null;
   onLogout: () => void;
   onOpenRoleSwitcher?: () => void;
   onToggleMobileMenu?: () => void;
@@ -17,6 +21,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   appData,
   currentUser,
+  lastSyncTime,
   onLogout,
   onOpenRoleSwitcher,
   onToggleMobileMenu,
@@ -129,17 +134,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* Offline / Online Badge */}
-        <div
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
-            isOnline
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : 'bg-amber-50 text-amber-800 border-amber-300'
-          }`}
-          title={isOnline ? 'Connected (Offline cache active)' : 'Offline mode active'}
-        >
-          {isOnline ? <Wifi className="w-3 h-3 text-emerald-600" /> : <WifiOff className="w-3 h-3 text-amber-600 animate-pulse" />}
-          <span className="hidden md:inline">{isOnline ? 'Online' : 'Offline'}</span>
+        {/* Offline / Online Badge & Sync Status */}
+        <div className="flex flex-col items-end mr-2">
+          <div
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+              isOnline
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-800 border-amber-300'
+            }`}
+            title={isOnline ? 'Connected (Offline cache active)' : 'Offline mode active'}
+          >
+            {isOnline ? <Wifi className="w-2.5 h-2.5 text-emerald-600" /> : <WifiOff className="w-2.5 h-2.5 text-amber-600 animate-pulse" />}
+            <span className="hidden md:inline">{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+          {lastSyncTime && isOnline && (
+            <div className="hidden lg:flex items-center gap-1 mt-0.5 text-[9px] font-medium text-gray-400">
+              <CheckCircle2 className="w-2.5 h-2.5 text-[#00A896]" />
+              Synced {formatDistanceToNow(lastSyncTime, { addSuffix: true })}
+            </div>
+          )}
         </div>
 
         {/* PWA Install Button */}

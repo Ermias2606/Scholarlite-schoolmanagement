@@ -55,30 +55,32 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
-export async function loadAppDataFromCloud(): Promise<AppData> {
+export async function loadAppDataFromCloud(): Promise<{ data: AppData, success: boolean }> {
   const path = 'schools/default_school';
   try {
     const docRef = doc(db, path);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as AppData;
+      return { data: docSnap.data() as AppData, success: true };
     } else {
       await setDoc(docRef, DEFAULT_APP_DATA);
-      return DEFAULT_APP_DATA;
+      return { data: DEFAULT_APP_DATA, success: true };
     }
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, path);
-    return DEFAULT_APP_DATA;
+    return { data: DEFAULT_APP_DATA, success: false };
   }
 }
 
-export async function saveAppDataToCloud(data: AppData): Promise<void> {
+export async function saveAppDataToCloud(data: AppData): Promise<boolean> {
   const path = 'schools/default_school';
   try {
     const docRef = doc(db, path);
     await setDoc(docRef, data);
+    return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, path);
+    return false;
   }
 }
 
