@@ -1,0 +1,21 @@
+{
+  "entities": {
+    "AppData": {
+      "title": "AppData",
+      "description": "The entire state of the school management system.",
+      "type": "object",
+      "properties": {
+        "settings": { "type": "object" },
+        "classes": { "type": "array" },
+        "users": { "type": "array" },
+        "auditLogs": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "schools/{schoolId}": {
+      "schema": { "$ref": "#/entities/AppData" },
+      "description": "Stores the monolithic app data for a school."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ScholarLite - School Management",
+  "description": "Offline-first school management PWA with role-based access control (Admin, Class Teacher, Subject Teacher, Student), gradebook, GPA analytics, report cards, and audit logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
