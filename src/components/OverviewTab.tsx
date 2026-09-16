@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   GraduationCap,
   Users,
@@ -47,7 +48,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const totalSubjects = visibleClasses.reduce((sum, c) => sum + (c.subjects?.length || 0), 0);
   const totalTerms = semesters.length;
 
-  // Aggregate student academic metrics across visible classes for the active term
+  const isAdmin = ['super_admin', 'school_admin', 'admin'].includes(currentUser.role);
+  const isTeacher = ['class_teacher', 'subject_teacher'].includes(currentUser.role);
+
+  // Admin Specific Metric
+  const pendingStudentsCount = appData.classes.reduce((sum, c) => 
+    sum + c.students.filter(s => s.status === 'pending').length
+  , 0);
+
+  const totalStaff = appData.users?.length || 0;
+
+  // Aggregate student academic metrics across visible classes for the active term academic metrics across visible classes for the active term
   interface StudentMetric {
     id: string;
     name: string;
@@ -139,7 +150,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             Welcome back, {currentUser.name}
           </h2>
           <p className="text-white/80 text-sm sm:text-base mt-2">
-            {currentUser.role === 'admin'
+            {['super_admin', 'school_admin', 'admin'].includes(currentUser.role)
               ? `Principal administrative workspace for ${settings.name}. Manage school cohorts, verify terminal grades, and inspect institutional audit logs.`
               : currentUser.role === 'class_teacher'
               ? `Class management cockpit. You have authority over student rosters, terminal attendance, and report cards for your assigned class.`
@@ -521,6 +532,67 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Quick Actions FAB (Admin Only) */}
+      {currentUser.role === 'admin' && (
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
+          <AnimatePresence>
+            {isFabOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                className="flex flex-col gap-2 pointer-events-auto"
+              >
+                <button
+                  onClick={() => onNavigateTab('manage_students')}
+                  className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-indigo-600 transition group"
+                >
+                  <span className="text-sm font-bold text-gray-700 group-hover:text-indigo-600">Register Student</span>
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <UserPlus className="w-4 h-4" />
+                  </div>
+                </button>
+                <button
+                  onClick={() => onNavigateTab('calendar')}
+                  className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-emerald-600 transition group"
+                >
+                  <span className="text-sm font-bold text-gray-700 group-hover:text-emerald-600">Add School Event</span>
+                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <CalendarPlus className="w-4 h-4" />
+                  </div>
+                </button>
+                <button
+                  onClick={() => onNavigateTab('results')}
+                  className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-amber-600 transition group"
+                >
+                  <span className="text-sm font-bold text-gray-700 group-hover:text-amber-600">Generate Report Cards</span>
+                  <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                    <FilePlus2 className="w-4 h-4" />
+                  </div>
+                </button>
+                <button
+                  onClick={() => onNavigateTab('manage_staff')}
+                  className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-rose-600 transition group"
+                >
+                  <span className="text-sm font-bold text-gray-700 group-hover:text-rose-600">Create Department / Staff</span>
+                  <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                    <SettingsIcon className="w-4 h-4" />
+                  </div>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <button
+            onClick={() => setIsFabOpen(!isFabOpen)}
+            className={`w-14 h-14 rounded-full bg-[#003366] text-white shadow-xl shadow-blue-900/20 flex items-center justify-center hover:bg-[#002244] transition-all transform pointer-events-auto ${isFabOpen ? 'rotate-45 bg-[#00A896]' : 'hover:scale-105'}`}
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };

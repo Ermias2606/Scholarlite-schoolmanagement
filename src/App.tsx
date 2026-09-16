@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Home,
+  CheckCircle2,
   GraduationCap,
   FileSpreadsheet,
   Settings as SettingsIcon,
@@ -10,6 +12,9 @@ import {
   UserCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  Building2,
+  BookOpen,
+  Layers,
 } from 'lucide-react';
 import {
   AppData,
@@ -26,6 +31,11 @@ import { DEFAULT_APP_DATA } from './utils/defaultData';
 import { createAuditLog } from './utils/audit';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { ManageClassesTab } from './components/ManageClassesTab';
+import { ManageSubjectsTab } from './components/ManageSubjectsTab';
+import { ManageStudentsTab } from './components/ManageStudentsTab';
+import { ManageStaffTab } from './components/ManageStaffTab';
+import { ManageLevelsTab } from './components/ManageLevelsTab';
 import { LandingView } from './components/LandingView';
 import { Navbar } from './components/Navbar';
 import { OverviewTab } from './components/OverviewTab';
@@ -45,9 +55,30 @@ export default function App() {
   useTheme(); // Initialize global theme on app load
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
-  const [activeTab, setActiveTab] = useState<'overview' | 'teacher_dashboard' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'teacher_dashboard' | 'manage_classes' | 'manage_subjects' | 'manage_students' | 'manage_staff' | 'manage_levels' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  
+  const routeUserToTab = (role: string) => {
+    if (['class_teacher', 'subject_teacher'].includes(role)) {
+      setActiveTab('teacher_dashboard');
+    } else {
+      setActiveTab('overview');
+    }
+  };
+
+  const [showSaveToast, setShowSaveToast] = useState(false);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerSaveToast = () => {
+    setShowSaveToast(true);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setShowSaveToast(false);
+    }, 2500);
+  };
+
 
   // Role and User state
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
@@ -92,6 +123,7 @@ export default function App() {
         }
         
         setCurrentUser(profile);
+        routeUserToTab(profile.role);
         setSelectedClassId(data.classes[0]?.id || null);
         setView('dashboard');
       } else {
@@ -156,6 +188,7 @@ export default function App() {
   // Switch persona and keep in appData
   const handleSelectUser = (user: UserProfile) => {
     setCurrentUser(user);
+    routeUserToTab(user.role);
     updateAppData((prev) => ({
       ...prev,
       currentUser: user,
@@ -503,12 +536,16 @@ export default function App() {
 
   // Define tab navigation based on current role permissions
   const allNavItems = [
-    { id: 'overview', label: 'Overview', icon: Home, roles: ['admin', 'class_teacher', 'subject_teacher'] },
+    { id: 'overview', label: 'Overview', icon: Home, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
     { id: 'teacher_dashboard', label: 'Teacher Dashboard', icon: UserCheck, roles: ['class_teacher', 'subject_teacher'] },
-    { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['admin', 'class_teacher', 'subject_teacher'] },
-    { id: 'classes', label: 'Classes & Students', icon: GraduationCap, roles: ['admin', 'class_teacher', 'subject_teacher'] },
-    { id: 'results', label: 'Results & Reports', icon: FileSpreadsheet, roles: ['admin', 'class_teacher', 'subject_teacher'] },
-    { id: 'settings', label: 'Settings & Security', icon: SettingsIcon, roles: ['admin'] },
+    { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
+    { id: 'manage_classes', label: 'Classes', icon: Building2, roles: ['super_admin', 'school_admin', 'admin'] },
+    { id: 'manage_subjects', label: 'Subjects', icon: BookOpen, roles: ['super_admin', 'school_admin', 'admin'] },
+    { id: 'manage_students', label: 'Students', icon: Users, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher'] },
+    { id: 'manage_staff', label: 'Staff', icon: ShieldCheck, roles: ['super_admin', 'school_admin', 'admin'] },
+    { id: 'manage_levels', label: 'Organization', icon: Layers, roles: ['super_admin', 'admin'] },
+    { id: 'results', label: 'Results & Reports', icon: FileSpreadsheet, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon, roles: ['super_admin', 'school_admin', 'admin'] },
   ] as const;
 
   const hasRole = (roles: readonly string[]) => {
@@ -527,7 +564,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F7F8FA] text-gray-800">
       {/* Top Navbar */}
-      <Navbar
+            <Navbar
         appData={appData}
         currentUser={currentUser}
         lastSyncTime={lastSyncTime}
@@ -538,7 +575,7 @@ export default function App() {
             setView('landing');
           }
         }}
-        onOpenRoleSwitcher={() => setIsRoleSwitcherOpen(true)}
+        onOpenRoleSwitcher={['super_admin', 'school_admin', 'admin'].includes(currentUser.role) ? () => setIsRoleSwitcherOpen(true) : undefined}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMobileMenuOpen={isMobileMenuOpen}
       />
@@ -550,6 +587,7 @@ export default function App() {
             <div className="max-w-6xl mx-auto">
               <StudentPortal
                 appData={appData}
+                    currentUser={currentUser}
                 studentId={activeStudentId}
                 classId={firstClass?.id}
               />
@@ -696,9 +734,9 @@ export default function App() {
                 {activeTab === 'classes' && (
                   <ClassesTab
                     appData={appData}
+                    currentUser={currentUser}
                     classes={appData.classes}
                     selectedClassId={selectedClassId}
-                    currentUser={currentUser}
                     onSelectClass={setSelectedClassId}
                     onAddClass={handleAddClass}
                     onDeleteClass={handleDeleteClass}
@@ -713,12 +751,63 @@ export default function App() {
                     }
                   />
                 )}
+                {activeTab === 'manage_classes' && (
+                  <ManageClassesTab
+                    appData={appData}
+                    
+                    onAddClass={(name, levelId) => {
+                      updateAppData(prev => ({
+                        ...prev,
+                        classes: [...prev.classes, { id: generateId('class'), name, levelId, subjects: [], students: [] }]
+                      }));
+                      handleAddAuditLog('Add Class', `Added class: ${name}`);
+                    }}
+                    onDeleteClass={handleDeleteClass}
+                  />
+                )}
+                {activeTab === 'manage_subjects' && (
+                  <ManageSubjectsTab
+                    appData={appData}
+                    
+                    onSaveSubject={handleSaveSubject}
+                    onDeleteSubject={handleDeleteSubject}
+                  />
+                )}
+                {activeTab === 'manage_students' && (
+                  <ManageStudentsTab
+                    appData={appData}
+                    currentUser={currentUser}
+                    onAddStudent={handleAddStudent}
+                    onUpdateStudent={handleUpdateStudent}
+                    onDeleteStudent={handleDeleteStudent}
+                  />
+                )}
+                {activeTab === 'manage_staff' && (
+                  <ManageStaffTab
+                    appData={appData}
+                    
+                    onUpdateUsers={(users) => {
+                      updateAppData((prev) => ({ ...prev, users }));
+                    }}
+                    onAddAuditLog={handleAddAuditLog}
+                  />
+                )}
+                {activeTab === 'manage_levels' && (
+                  <ManageLevelsTab
+                    appData={appData}
+                    onUpdateLevels={(levels) => updateAppData(prev => ({ ...prev, levels }))}
+                    onUpdateDepartments={(departments) => updateAppData(prev => ({ ...prev, departments }))}
+                    onUpdateBranches={(branches) => updateAppData(prev => ({ ...prev, branches }))}
+                    onAddAuditLog={handleAddAuditLog}
+                  />
+                )}
+
 
                 {activeTab === 'results' && (
                   <ResultsTab
                     appData={appData}
-                    initialClassId={selectedClassId}
                     currentUser={currentUser}
+                    initialClassId={selectedClassId}
                     onSaveStudentMarks={handleSaveStudentMarks}
                     onEditRemarksAttendance={(student) => {
                       const foundClass = appData.classes.find((c) =>
@@ -769,6 +858,22 @@ export default function App() {
         term={appData.settings.semesters[0] || 'Term 1'}
         onSave={handleSaveRemarksAttendance}
       />
+
+      
+      {/* Auto-save Toast */}
+      <AnimatePresence>
+        {showSaveToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-gray-900/90 backdrop-blur-sm text-white rounded-xl shadow-lg border border-gray-700/50 pointer-events-none"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-sm font-medium">Auto-saved</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Offline Status Toast */}
       <OfflineIndicator />

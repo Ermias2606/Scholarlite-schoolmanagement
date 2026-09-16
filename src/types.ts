@@ -13,6 +13,8 @@ export interface Subject {
 export interface StudentMarks {
   marks: Record<string, number>; // assessmentName -> mark
   total: number;
+  approved?: boolean;
+  approvedBy?: string;
 }
 
 export interface StudentAttendance {
@@ -32,6 +34,7 @@ export interface Student {
   rollNo: number;
   name: string;
   gender: 'Male' | 'Female' | 'Other';
+  status?: 'pending' | 'approved';
   // results: [academicYear][term][subjectName] -> StudentMarks
   results: Record<string, Record<string, Record<string, StudentMarks>>>;
   // attendance: [academicYear][term] -> StudentAttendance
@@ -49,7 +52,7 @@ export interface SchoolClass {
   students: Student[];
 }
 
-export type UserRole = 'admin' | 'class_teacher' | 'subject_teacher' | 'student';
+export type UserRole = 'super_admin' | 'school_admin' | 'admin' | 'class_teacher' | 'subject_teacher' | 'student';
 
 export interface UserProfile {
   id: string;
@@ -65,6 +68,12 @@ export interface UserProfile {
   assignedClassIds?: string[];
   assignedSubjects?: string[];
   assignedStudentId?: string;
+  // HCM Features
+  phone?: string;
+  department?: string;
+  joinDate?: string;
+  staffStatus?: 'active' | 'leave' | 'terminated';
+  address?: string;
 }
 
 export interface AuditLog {
@@ -105,16 +114,33 @@ export interface SchoolEvent {
   description?: string;
 }
 
+export interface Department {
+  id: string;
+  name: string;
+  headId?: string; // User ID
+  description?: string;
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  location?: string;
+  branchHeadId?: string; // User ID
+}
+
 export interface SchoolLevel {
   id: string;
   admissionNumber?: string;
   name: string;
   order: number;
+  headId?: string; // User ID
 }
 
 export interface AppData {
   settings: Settings;
   levels?: SchoolLevel[];
+  departments?: Department[];
+  branches?: Branch[];
   classes: SchoolClass[];
   events?: SchoolEvent[];
   users: UserProfile[];
@@ -134,6 +160,8 @@ export interface StudentTermAnalysis extends Student {
     string,
     {
       total: number;
+  approved?: boolean;
+  approvedBy?: string;
       maxScore: number;
       percentage: number;
       grade: string;
@@ -192,6 +220,7 @@ export interface StudentPerformanceTrend {
   rollNo: number;
   name: string;
   gender: 'Male' | 'Female' | 'Other';
+  status?: 'pending' | 'approved';
   currentTotal: number;
   currentMaxScore: number;
   currentPercentage: number;
