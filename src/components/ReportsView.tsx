@@ -22,6 +22,7 @@ import {
   getGradeInfo,
 } from '../utils/calculations';
 import { StudentPerformanceSummaryView } from './StudentPerformanceSummaryView';
+import { ReportCardTemplate } from './ReportCardTemplate';
 
 interface ReportsViewProps {
   appData: AppData;
@@ -128,72 +129,62 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }, 150);
   };
 
+
+  // Check if all marks are approved
+  const allSubjects = activeClass.subjects || [];
+  const isTermFullyApproved = activeClass.students.length > 0 && activeClass.students.every(student => 
+    allSubjects.every(sub => 
+      student.results?.[selectedYear]?.[selectedSemester]?.[sub.name]?.approved
+    )
+  );
+
+  const canGenerateReports = appData.currentUser?.role !== 'subject_teacher' && appData.currentUser?.role !== 'student';
+
   return (
     <div className="space-y-6">
+      {!isTermFullyApproved && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-800">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold text-sm">Marks Pending Approval</h4>
+            <p className="text-xs mt-1">Not all subject marks for this term have been approved. Reports may be incomplete or unofficial until an administrator or class teacher approves all subject marks.</p>
+          </div>
+        </div>
+      )}
+      
+      {!canGenerateReports && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800">
+          <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold text-sm">Restricted Access</h4>
+            <p className="text-xs mt-1">Your current role does not have permission to view or generate official reports.</p>
+          </div>
+        </div>
+      )}
       {/* Report Selector Pills */}
-      <div className="flex flex-wrap gap-2 pb-2 no-print border-b border-gray-200">
-        <button
-          onClick={() => onSelectReportType('summary')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            reportType === 'summary'
-              ? 'bg-[#003366] text-white shadow-xs'
-              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          ⭐ Class Summary
-        </button>
-        <button
-          id="tab-btn-performance-summary"
-          onClick={() => onSelectReportType('student_performance_summary')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-            reportType === 'student_performance_summary'
-              ? 'bg-[#00A896] text-white shadow-xs'
-              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-          <span>🚀 Student Performance Summary</span>
-        </button>
-        <button
-          onClick={() => onSelectReportType('master_sheet')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            reportType === 'master_sheet'
-              ? 'bg-[#00A896] text-white shadow-xs'
-              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          📑 Whole Term Master Sheet
-        </button>
-        <button
-          onClick={() => onSelectReportType('rank_list')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            reportType === 'rank_list'
-              ? 'bg-[#003366] text-white shadow-xs'
-              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          📈 Cumulative Rank List
-        </button>
-        <button
-          onClick={() => onSelectReportType('performance')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            reportType === 'performance'
-              ? 'bg-[#003366] text-white shadow-xs'
-              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          📊 Performance Analysis
-        </button>
-        <button
-          onClick={() => onSelectReportType('report_card')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            reportType === 'report_card'
-              ? 'bg-[#FFC300] text-[#003366] shadow-xs'
-              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          🎓 Student Report Card
-        </button>
+      <div className="flex flex-wrap gap-2 pb-4 mb-2 no-print border-b border-gray-200">
+        {[
+          { id: 'summary', icon: '⭐', label: 'Class Summary', activeColor: 'bg-[#003366] text-white shadow-md' },
+          { id: 'student_performance_summary', icon: '🚀', label: 'Student Performance Summary', activeColor: 'bg-[#00A896] text-white shadow-md' },
+          { id: 'master_sheet', icon: '📑', label: 'Whole Term Master Sheet', activeColor: 'bg-[#00A896] text-white shadow-md' },
+          { id: 'rank_list', icon: '📈', label: 'Cumulative Rank List', activeColor: 'bg-[#003366] text-white shadow-md' },
+          { id: 'performance', icon: '📊', label: 'Performance Analysis', activeColor: 'bg-[#003366] text-white shadow-md' },
+          { id: 'report_card', icon: '🎓', label: 'Student Report Card', activeColor: 'bg-[#FFC300] text-[#003366] shadow-md ring-2 ring-[#FFC300]/50 ring-offset-1' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            id={tab.id === 'student_performance_summary' ? 'tab-btn-performance-summary' : undefined}
+            onClick={() => onSelectReportType(tab.id as any)}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              reportType === tab.id
+                ? tab.activeColor
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 hover:text-gray-900 shadow-sm'
+            }`}
+          >
+            <span className="text-base">{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* 1. Class Summary Report */}
@@ -567,7 +558,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
       {/* 5. Student Report Card */}
       {reportType === 'report_card' && (
-        <div className="space-y-4 animate-in fade-in duration-150">
+        <div className="space-y-4 animate-in fade-in duration-150 relative">
           {/* Controls Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-gray-200 shadow-xs no-print">
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -617,212 +608,49 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
           </div>
 
-          {/* Report Card Document */}
-          {reportCardStudent && (
-            <div className="bg-white rounded-3xl border border-gray-200 shadow-md p-6 sm:p-10 max-w-4xl mx-auto printable-report printable-report-card print:m-0 print:p-6 print:border-none print:shadow-none">
-              {/* Card Header */}
-              <div className="text-center pb-6 border-b-2 border-gray-800">
-                <img
-                  src={appData.settings.logo || '/icon.svg'}
-                  alt="School Logo"
-                  className="w-20 h-20 mx-auto object-contain mb-2 p-1 border-2 border-[#FFC300] rounded-full"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/icon.svg';
-                  }}
-                />
-                <h1 className="text-2xl sm:text-3xl font-black text-[#003366] tracking-tight uppercase">
-                  {appData.settings.name}
-                </h1>
-                <p className="text-xs sm:text-sm font-bold text-gray-700 tracking-wider mt-1">
-                  OFFICIAL ACADEMIC REPORT CARD &bull; {selectedSemester.toUpperCase()} ({selectedYear})
-                </p>
-              </div>
+          {/* Single Report Card View */}
+          <div className={isBatchPrinting ? 'hidden' : 'block'}>
+            {reportCardStudent && rawStudent && (
+              <ReportCardTemplate
+                appData={appData}
+                activeClass={activeClass}
+                rawStudent={rawStudent}
+                reportCardStudent={reportCardStudent}
+                selectedYear={selectedYear}
+                selectedSemester={selectedSemester}
+                termStudentsLength={termStudents.length}
+                fullStudentsLength={fullAnalysis?.studentData.length || termStudents.length}
+                termMaxScore={termMaxScore}
+                subjects={subjects}
+              />
+            )}
+          </div>
 
-              {/* Student Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 py-5 border-b border-gray-200 text-xs sm:text-sm">
-                <div>
-                  <span className="text-gray-500 font-medium block text-[11px]">STUDENT NAME</span>
-                  <span className="font-extrabold text-gray-900 text-base">{reportCardStudent.name}</span>
+          {/* Batch Print Hidden Container */}
+          <div className={isBatchPrinting ? 'block print:block' : 'hidden'}>
+            {fullAnalysis?.studentData.map((student) => {
+              const rStudent = activeClass.students.find(s => s.id === student.id);
+              if (!rStudent) return null;
+              return (
+                <div key={student.id} className="print-page-break">
+                  <ReportCardTemplate
+                    appData={appData}
+                    activeClass={activeClass}
+                    rawStudent={rStudent}
+                    reportCardStudent={student}
+                    selectedYear={selectedYear}
+                    selectedSemester={selectedSemester}
+                    termStudentsLength={termStudents.length}
+                    fullStudentsLength={fullAnalysis.studentData.length}
+                    termMaxScore={termMaxScore}
+                    subjects={subjects}
+                  />
                 </div>
-                <div>
-                  <span className="text-gray-500 font-medium block text-[11px]">ROLL NUMBER</span>
-                  <span className="font-extrabold text-gray-900 text-base">#{reportCardStudent.rollNo}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 font-medium block text-[11px]">CLASS COHORT</span>
-                  <span className="font-extrabold text-gray-900 text-base">{activeClass.name}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 font-medium block text-[11px]">ATTENDANCE RECORD</span>
-                  <span className="font-semibold text-gray-800">
-                    {attendance.presentDays} / {attendance.totalDays} days ({attendanceRate}%)
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500 font-medium block text-[11px]">TERM RANK</span>
-                  <span className="font-bold text-[#003366]">
-                    #{reportCardStudent.termRank} of {termStudents.length}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500 font-medium block text-[11px]">CUMULATIVE RANK</span>
-                  <span className="font-black text-rose-600 text-base">
-                    #{reportCardStudent.rank} of {fullAnalysis.studentData.length}
-                  </span>
-                </div>
-              </div>
-
-              {/* Subject Breakdown Table */}
-              <div className="mt-5">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Academic Performance &amp; Assessment Breakdown
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm border border-gray-300 border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 text-gray-800 font-bold border-b border-gray-300">
-                        <th className="py-2.5 px-3 border-r border-gray-300">Subject</th>
-                        <th className="py-2.5 px-3 text-center border-r border-gray-300">Assessment Breakdown</th>
-                        <th className="py-2.5 px-3 text-center border-r border-gray-300 w-16">Max</th>
-                        <th className="py-2.5 px-3 text-center border-r border-gray-300 w-20">Obtained</th>
-                        <th className="py-2.5 px-3 text-center border-r border-gray-300 w-20">Grade</th>
-                        <th className="py-2.5 px-3 text-center w-20">Result</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {subjects.map((sub) => {
-                        const markData = reportCardStudent.subjectMarks[sub.name];
-                        const obtained = markData ? markData.total : 0;
-                        const max = markData ? markData.maxScore : s_max(sub);
-                        const isPass = max > 0 && obtained / max >= 0.5;
-                        const breakdown = markData?.marks || {};
-                        const gradeInfo = getGradeInfo(max > 0 ? (obtained / max) * 100 : 0);
-
-                        return (
-                          <tr key={sub.name} className="border-b border-gray-200">
-                            <td className="py-2.5 px-3 font-bold text-gray-900 border-r border-gray-200">
-                              {sub.name}
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-gray-200 text-xs">
-                              {sub.assessments.map((a) => (
-                                <span key={a.id || a.name} className="mr-2 text-gray-600">
-                                  {a.name}: <strong className="text-gray-900">{breakdown[a.name] ?? '-'}</strong>/{a.maxScore}
-                                </span>
-                              ))}
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-semibold text-gray-600 border-r border-gray-200">
-                              {max}
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-extrabold text-[#003366] border-r border-gray-200">
-                              {obtained}
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-bold border-r border-gray-200">
-                              <span
-                                className={`px-2 py-0.5 rounded text-xs border ${gradeInfo.badgeColor}`}
-                              >
-                                {gradeInfo.grade}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-bold">
-                              <span
-                                className={`px-2 py-0.5 rounded text-xs ${
-                                  isPass
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-rose-100 text-rose-800'
-                                }`}
-                              >
-                                {isPass ? 'PASS' : 'FAIL'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-gray-100 font-extrabold text-[#003366] border-t-2 border-gray-300">
-                        <td colSpan={2} className="py-2.5 px-3 text-right uppercase text-xs">
-                          Term Grand Total:
-                        </td>
-                        <td className="py-2.5 px-3 text-center">{termMaxScore}</td>
-                        <td className="py-2.5 px-3 text-center text-base">{reportCardStudent.termTotal}</td>
-                        <td className="py-2.5 px-3 text-center text-sm font-black text-[#00A896]">
-                          {reportCardStudent.grade}
-                        </td>
-                        <td className="py-2.5 px-3 text-center text-sm font-black text-[#00A896]">
-                          {reportCardStudent.termAveragePercentage.toFixed(2)}%
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-
-              {/* Cumulative Result Box */}
-              <div className="mt-6 p-4 rounded-2xl bg-amber-50/80 border-2 border-dashed border-[#FFC300] text-center space-y-1">
-                <p className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                  CUMULATIVE ACADEMIC STANDING ({selectedYear})
-                </p>
-                <div className="text-base sm:text-lg font-black text-[#003366]">
-                  {reportCardStudent.cumulativeTotal} / {reportCardStudent.cumulativeMaxScore} pts
-                  &bull; Cumulative GPA: {reportCardStudent.cumulativeGPA.toFixed(1)} (Grade {reportCardStudent.cumulativeGrade})
-                </div>
-                <div className="text-xl sm:text-2xl font-black text-[#00A896]">
-                  OVERALL AVERAGE: {reportCardStudent.overallAveragePercentage.toFixed(2)}%
-                </div>
-              </div>
-
-              {/* Remarks & Conduct */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[#003366] tracking-wider">
-                      Teacher Remark
-                    </span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                      Conduct: {remarks.conduct || 'Exemplary'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-700 italic leading-relaxed">
-                    &ldquo;{remarks.teacherRemark}&rdquo;
-                  </p>
-                </div>
-
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-1.5">
-                  <span className="text-[11px] font-bold uppercase text-[#003366] tracking-wider block">
-                    Principal&apos;s Endorsement
-                  </span>
-                  <p className="text-xs text-gray-700 italic leading-relaxed">
-                    &ldquo;{remarks.principalRemark}&rdquo;
-                  </p>
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="mt-10 pt-6 border-t border-gray-300 grid grid-cols-3 gap-4 text-center text-xs text-gray-600">
-                <div>
-                  <div className="border-b border-gray-400 pb-1 mb-1 font-medium">Class Teacher</div>
-                  <span className="text-[10px] text-gray-400">Signature</span>
-                </div>
-                <div>
-                  <div className="border-b border-gray-400 pb-1 mb-1 font-medium">
-                    {new Date().toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </div>
-                  <span className="text-[10px] text-gray-400">Issue Date</span>
-                </div>
-                <div>
-                  <div className="border-b border-gray-400 pb-1 mb-1 font-medium">Principal / Headmaster</div>
-                  <span className="text-[10px] text-gray-400">Signature &amp; Stamp</span>
-                </div>
-              </div>
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
-      )}
-    </div>
+      )}</div>
   );
 };
 

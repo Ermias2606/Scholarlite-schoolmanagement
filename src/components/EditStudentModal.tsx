@@ -6,7 +6,7 @@ interface EditStudentModalProps {
   isOpen: boolean;
   student: Student | null;
   onClose: () => void;
-  onSave: (updatedStudent: { id: string; rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }) => void;
+  onSave: (updatedStudent: { id: string; rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other'; parentName?: string; parentContact?: string; }) => void;
   existingRollNos: number[];
 }
 
@@ -20,6 +20,8 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
   const [rollNo, setRollNo] = useState<number | ''>('');
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [parentName, setParentName] = useState('');
+  const [parentContact, setParentContact] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {

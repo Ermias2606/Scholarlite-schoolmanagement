@@ -408,12 +408,86 @@ export default function App() {
   };
 
   // --- Handlers for Marks ---
+  const handleApproveMarks = (classId: string, year: string, semester: string, subjectName: string) => {
+    setAppData((prev) => {
+      const newClasses = prev.classes.map((cls) => {
+        if (cls.id !== classId) return cls;
+        return {
+          ...cls,
+          students: cls.students.map((student) => {
+            const results = student.results || {};
+            const yearData = results[year] || {};
+            const semData = yearData[semester] || {};
+            const subData = semData[subjectName] || { marks: {}, total: 0 };
+            
+            return {
+              ...student,
+              results: {
+                ...results,
+                [year]: {
+                  ...yearData,
+                  [semester]: {
+                    ...semData,
+                    [subjectName]: {
+                      ...subData,
+                      approved: true,
+                      approvedBy: currentUser?.id,
+                    }
+                  }
+                }
+              }
+            };
+          }),
+        };
+      });
+      return { ...prev, classes: newClasses };
+    });
+    alert(`Marks for ${subjectName} approved successfully!`);
+  };
+
+  const handleRejectMarks = (classId: string, year: string, semester: string, subjectName: string) => {
+    setAppData((prev) => {
+      const newClasses = prev.classes.map((cls) => {
+        if (cls.id !== classId) return cls;
+        return {
+          ...cls,
+          students: cls.students.map((student) => {
+            const results = student.results || {};
+            const yearData = results[year] || {};
+            const semData = yearData[semester] || {};
+            const subData = semData[subjectName] || { marks: {}, total: 0 };
+            
+            return {
+              ...student,
+              results: {
+                ...results,
+                [year]: {
+                  ...yearData,
+                  [semester]: {
+                    ...semData,
+                    [subjectName]: {
+                      ...subData,
+                      approved: false, // explicitly false means rejected
+                      approvedBy: undefined,
+                    }
+                  }
+                }
+              }
+            };
+          }),
+        };
+      });
+      return { ...prev, classes: newClasses };
+    });
+    alert(`Marks for ${subjectName} have been rejected.`);
+  };
+
   const handleSaveStudentMarks = (
     classId: string,
     year: string,
     semester: string,
     subjectName: string,
-    marksMap: Record<string, { marks: Record<string, number>; total: number }>
+    marksMap: Record<string, { marks: Record<string, number>; total: number; previousMarks?: Record<string, number>; editRemark?: string; lastEditedAt?: string }>
   ) => {
     updateAppData((prev) => {
       const classes = prev.classes.map((c) => {
@@ -427,7 +501,14 @@ export default function App() {
           if (!results[year]) results[year] = {};
           if (!results[year][semester]) results[year][semester] = {};
 
-          results[year][semester][subjectName] = entry;
+          
+          // Preserve approved status if updating an existing entry
+          const existingEntry = results[year][semester][subjectName] || {};
+          results[year][semester][subjectName] = {
+            ...entry,
+            approved: existingEntry.approved,
+            approvedBy: existingEntry.approvedBy,
+          };
 
           return {
             ...student,
@@ -502,8 +583,72 @@ export default function App() {
   // Landing Page View
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#003366]">
-        <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#001F3F] relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00A896]/20 blur-[100px] rounded-full pointer-events-none" />
+        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="relative z-10 flex flex-col items-center gap-6"
+        >
+          {/* Logo animation */}
+          <div className="relative">
+            <motion.img 
+              src="/icon.svg" 
+              alt="ScholarLite Logo" 
+              className="w-24 h-24 sm:w-28 sm:h-28 drop-shadow-2xl z-10 relative"
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            {/* Spinning ring around the logo */}
+            <motion.div 
+              className="absolute -inset-4 border border-dashed border-[#00A896]/30 rounded-[35px] sm:rounded-[40px] z-0"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+            />
+            <motion.div 
+              className="absolute -inset-8 border border-[#00A896]/10 rounded-[45px] sm:rounded-[50px] z-0"
+              animate={{ rotate: -360, scale: [1, 1.05, 1] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <motion.h1 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-cinzel"
+            >
+              ScholarLite
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-[#00A896] text-sm sm:text-base font-medium tracking-wide uppercase"
+            >
+              Initializing Workspace
+            </motion.p>
+          </div>
+
+          {/* Progress bar */}
+          <motion.div 
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: "100%" }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="w-48 sm:w-64 h-1 mt-4 bg-white/10 rounded-full overflow-hidden"
+          >
+            <motion.div 
+              className="h-full bg-gradient-to-r from-[#00E5FF] to-[#00A896] rounded-full"
+              initial={{ x: "-100%" }}
+              animate={{ x: "100%" }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </motion.div>
+        </motion.div>
       </div>
     );
   }
@@ -798,7 +943,9 @@ export default function App() {
                     appData={appData}
                     currentUser={currentUser}
                     initialClassId={selectedClassId}
-                    onSaveStudentMarks={handleSaveStudentMarks}
+                    onApproveMarks={handleApproveMarks}
+                    onRejectMarks={handleRejectMarks}
+              onSaveStudentMarks={handleSaveStudentMarks}
                     onEditRemarksAttendance={(student) => {
                       const foundClass = appData.classes.find((c) =>
                         c.students.some((s) => s.id === student.id)

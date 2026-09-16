@@ -230,7 +230,7 @@ export function downloadCSV(filename: string, content: string): void {
 }
 
 export function downloadRosterTemplateCSV(): void {
-  const content = 'Roll_No,Student_Name,Gender\n1,Alice Johnson,Female\n2,David Miller,Male\n3,Samira Khan,Female';
+  const content = 'Roll_No,Student_Name,Gender,Parent_Name,Parent_Contact\n1,Alice Johnson,Female,John Johnson,555-0101\n2,David Miller,Male,Sarah Miller,555-0102\n3,Samira Khan,Female,Ali Khan,555-0103';
   downloadCSV('Student_Roster_Template.csv', content);
 }
 
@@ -244,11 +244,11 @@ export function downloadMarkTemplateCSV(classData: SchoolClass, subject: Subject
   downloadCSV(`Marks_Template_${classData.name}_${subject.name.replace(/\s+/g, '_')}.csv`, content);
 }
 
-export function parseRosterCSV(csv: string): { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }[] {
+export function parseRosterCSV(csv: string): { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other'; parentName?: string; parentContact?: string }[] {
   const lines = csv.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length <= 1) return [];
 
-  const results: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }[] = [];
+  const results: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other'; parentName?: string; parentContact?: string }[] = [];
   // Skip header
   for (let i = 1; i < lines.length; i++) {
     const parts = lines[i].split(',').map((p) => p.trim().replace(/^"(.*)"$/, '$1'));
@@ -259,9 +259,11 @@ export function parseRosterCSV(csv: string): { rollNo: number; name: string; gen
       let gender: 'Male' | 'Female' | 'Other' = 'Other';
       if (rawGender.startsWith('m')) gender = 'Male';
       else if (rawGender.startsWith('f')) gender = 'Female';
+      const parentName = parts[3] || '';
+      const parentContact = parts[4] || '';
 
       if (!isNaN(rollNo) && name) {
-        results.push({ rollNo, name, gender });
+        results.push({ rollNo, name, gender, parentName, parentContact });
       }
     }
   }

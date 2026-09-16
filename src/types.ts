@@ -15,6 +15,9 @@ export interface StudentMarks {
   total: number;
   approved?: boolean;
   approvedBy?: string;
+  previousMarks?: Record<string, number>;
+  editRemark?: string;
+  lastEditedAt?: string;
 }
 
 export interface StudentAttendance {
@@ -34,6 +37,8 @@ export interface Student {
   rollNo: number;
   name: string;
   gender: 'Male' | 'Female' | 'Other';
+  parentName?: string;
+  parentContact?: string;
   status?: 'pending' | 'approved';
   // results: [academicYear][term][subjectName] -> StudentMarks
   results: Record<string, Record<string, Record<string, StudentMarks>>>;

@@ -9,22 +9,28 @@ import {
   BookOpen,
   Printer,
   TrendingUp,
+  Edit3,
+  XCircle,
+  FileCheck2,
 } from 'lucide-react';
 import { AppData, SchoolClass, Subject, UserProfile, Student } from '../types';
 import { downloadMarkTemplateCSV, parseMarksCSV } from '../utils/calculations';
 import { ReportsView } from './ReportsView';
 import { PrintReportCardModal } from './PrintReportCardModal';
+import { ReviewMarksModal } from './ReviewMarksModal';
 
 interface ResultsTabProps {
   appData: AppData;
   initialClassId?: string | null;
   currentUser?: UserProfile;
+  onApproveMarks?: (classId: string, year: string, semester: string, subjectName: string) => void;
+  onRejectMarks?: (classId: string, year: string, semester: string, subjectName: string) => void;
   onSaveStudentMarks: (
     classId: string,
     year: string,
     semester: string,
     subjectName: string,
-    marksMap: Record<string, { marks: Record<string, number>; total: number }>
+    marksMap: Record<string, { marks: Record<string, number>; total: number; previousMarks?: Record<string, number>; editRemark?: string; lastEditedAt?: string }>
   ) => void;
   onEditRemarksAttendance?: (student: Student) => void;
 }
@@ -33,6 +39,8 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
   appData,
   initialClassId,
   currentUser,
+  onApproveMarks,
+  onRejectMarks,
   onSaveStudentMarks,
   onEditRemarksAttendance,
 }) => {
@@ -55,6 +63,9 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
   );
   const [selectedSubjectName, setSelectedSubjectName] = useState<string>('');
 
+  const canApprove = currentUser?.role === 'school_admin' || currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.role === 'class_teacher';
+  
+  const [subTab, setSubTab] = useState<'mark_entry' | 'approvals' | 'reports'>('mark_entry');
   const [reportType, setReportType] = useState<
     'summary' | 'student_performance_summary' | 'rank_list' | 'master_sheet' | 'performance' | 'report_card'
   >('summary');
@@ -66,6 +77,7 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printStudentId, setPrintStudentId] = useState<string | undefined>(undefined);
   const [isDragging, setIsDragging] = useState(false);
+  const [reviewSubject, setReviewSubject] = useState<Subject | null>(null);
 
   const bulkUploadRef = useRef<HTMLInputElement | null>(null);
 
@@ -80,7 +92,22 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
     return true;
   }) || [];
 
-  const activeSubject = availableSubjects.find((s) => s.name === selectedSubjectName) || null;
+  const activeSubject = availableSubjects.find((s) => s.name === selectedSubjectName) || availableSubjects[0] || null;
+  const isSubjectApproved = activeClass?.students.some(s => s.results?.[selectedYear]?.[selectedSemester]?.[activeSubject?.name || '']?.approved) || false;
+
+  // Enforce tab limits based on role
+  useEffect(() => {
+    if (!canApprove && subTab !== 'mark_entry') {
+      setSubTab('mark_entry');
+    }
+  }, [canApprove, subTab]);
+
+  // Default subject selection
+  useEffect(() => {
+    if (activeSubject && selectedSubjectName !== activeSubject.name) {
+      setSelectedSubjectName(activeSubject.name);
+    }
+  }, [activeSubject, selectedSubjectName]);
 
   // Sync marksBuffer whenever selected subject, class, year, or term changes
   useEffect(() => {
@@ -99,7 +126,6 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
         const val = existing?.marks?.[asm.name];
         studentMarks[asm.name] = val !== undefined ? val : '';
       });
-
       newBuffer[student.id] = studentMarks;
     });
 
@@ -125,31 +151,64 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
     }
 
     const warnings: string[] = [];
-    const resultMap: Record<string, { marks: Record<string, number>; total: number }> = {};
+    const resultMap: Record<string, { marks: Record<string, number>; total: number; previousMarks?: Record<string, number>; editRemark?: string; lastEditedAt?: string }> = {};
+
+    let hasEdits = false;
 
     activeClass.students.forEach((student) => {
+      const existingEntry = student.results?.[selectedYear]?.[selectedSemester]?.[activeSubject.name];
+      const existingMarks = existingEntry?.marks;
       const studentScores = marksBuffer[student.id] || {};
       const marksClean: Record<string, number> = {};
       let total = 0;
+      
+      let studentHasEdits = false;
 
       activeSubject.assessments.forEach((asm) => {
         const val = studentScores[asm.name];
         const num = typeof val === 'number' && !isNaN(val) ? val : 0;
-
+        
         if (num > asm.maxScore) {
           warnings.push(
             `${student.name} score ${num} exceeds maximum ${asm.maxScore} for ${asm.name}`
           );
         }
+        
         marksClean[asm.name] = num;
         total += num;
+        
+        if (existingMarks && existingMarks[asm.name] !== undefined && existingMarks[asm.name] !== num) {
+          studentHasEdits = true;
+          hasEdits = true;
+        }
       });
 
       resultMap[student.id] = {
         marks: marksClean,
         total,
+        ...(studentHasEdits ? { previousMarks: existingMarks } : {})
       };
     });
+    
+    let globalEditRemark = '';
+    if (hasEdits) {
+      const remark = window.prompt("You are modifying existing marks. Please provide a reason for this change:");
+      if (remark === null) {
+        return; // Cancelled
+      }
+      globalEditRemark = remark || 'No remark provided';
+    }
+    
+    // Apply remark to edited students
+    if (hasEdits) {
+      const now = new Date().toISOString();
+      Object.keys(resultMap).forEach(studentId => {
+        if (resultMap[studentId].previousMarks) {
+          resultMap[studentId].editRemark = globalEditRemark;
+          resultMap[studentId].lastEditedAt = now;
+        }
+      });
+    }
 
     onSaveStudentMarks(
       activeClass.id,
@@ -215,12 +274,10 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
     e.preventDefault();
     if (activeSubject) setIsDragging(true);
   };
-
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -238,323 +295,432 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
     0
   ) || 0;
 
-  return (
-    <div className="space-y-6">
-      {/* Configuration Toolbar */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-5 sm:p-6 no-print">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 text-[#003366] font-bold text-base">
-            <FileSpreadsheet className="w-5 h-5" />
-            <span>Results Processing &amp; Mark Entry Hub</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              id="btn-results-print-report-card"
-              type="button"
-              onClick={() => {
-                setPrintStudentId(undefined);
-                setIsPrintModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003366] hover:bg-[#002244] text-white text-xs sm:text-sm font-bold shadow-xs transition active:scale-95 cursor-pointer"
-              title="Print official student report card formatted for PDF"
-            >
-              <Printer className="w-4 h-4 text-[#FFC300]" />
-              <span>Print Report Card</span>
-              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#FFC300] text-[#003366]">
-                PDF
-              </span>
-            </button>
-          </div>
+  const renderMarkEntryView = () => (
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-5 sm:p-6 no-print">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-2">
+        <div>
+          <span className="text-xs font-bold text-[#00A896] uppercase tracking-wider">
+            Mark Entry Spreadsheet
+          </span>
+          <h3 className="text-lg font-black text-[#003366]">
+            {activeSubject?.name} &mdash; {selectedSemester} ({selectedYear})
+          </h3>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Select Class</label>
-            <select
-              value={selectedClassId}
-              onChange={(e) => {
-                setSelectedClassId(e.target.value);
-                setSelectedSubjectName('');
-              }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold outline-none focus:border-[#00A896] bg-white"
-            >
-              {visibleClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.students?.length || 0} students)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Academic Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold outline-none focus:border-[#00A896] bg-white"
-            >
-              <option value={settings.academicYear}>{settings.academicYear}</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Semester / Term</label>
-            <select
-              value={selectedSemester}
-              onChange={(e) => setSelectedSemester(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold outline-none focus:border-[#00A896] bg-white"
-            >
-              {settings.semesters.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Subject select for Mark Entry */}
-        <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex-1 max-w-sm">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Select Subject (for Mark Entry Spreadsheet)
-            </label>
-            <select
-              value={selectedSubjectName}
-              onChange={(e) => setSelectedSubjectName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold outline-none focus:border-[#00A896] bg-white"
-            >
-              <option value="">-- No Subject (View Reports Only) --</option>
-              {availableSubjects.map((sub) => (
-                <option key={sub.name} value={sub.name}>
-                  {sub.name} ({sub.assessments.reduce((sum, a) => sum + (Number(a.maxScore) || 0), 0)} pts)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {!activeSubject && (
-            <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              <button
-                type="button"
-                id="btn-open-performance-summary"
-                onClick={() => setReportType('student_performance_summary')}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#00A896] hover:bg-[#008f80] text-white text-xs font-bold shadow-xs transition cursor-pointer"
-              >
-                <TrendingUp className="w-4 h-4" />
-                <span>🚀 Open Student Performance Summary</span>
-              </button>
-            </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
+            Max Total: {activeSubjectTotalMax} Marks
+          </span>
+          {isSubjectApproved && (
+            <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full flex items-center gap-1 border border-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Approved & Locked
+            </span>
           )}
-
-          {activeSubject && (
-            <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
+          {!isSubjectApproved && (
+            <>
               <button
-                onClick={() => downloadMarkTemplateCSV(activeClass, activeSubject)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-xs font-semibold text-gray-700 transition cursor-pointer"
-                title="Download mark spreadsheet template"
+                onClick={() => activeClass && activeSubject && downloadMarkTemplateCSV(activeClass, activeSubject)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-bold rounded-xl shadow-xs transition cursor-pointer"
+                title="Download CSV template for bulk uploading marks"
               >
-                <Download className="w-3.5 h-3.5 text-gray-500" />
-                <span>Mark Template (CSV)</span>
+                <Download className="w-4 h-4 text-gray-500" />
+                <span>Download Template</span>
               </button>
-
-              <input
-                type="file"
-                ref={bulkUploadRef}
-                accept=".csv"
-                className="hidden"
-                onChange={handleBulkMarkUpload}
-              />
-
-              <button
-                onClick={() => bulkUploadRef.current?.click()}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-                title="Bulk upload marks from CSV"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload Marks (CSV)</span>
-              </button>
-
               <button
                 onClick={handleSaveMarks}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#003366] hover:bg-[#002244] text-white text-xs sm:text-sm font-bold shadow-sm transition active:scale-95 cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Marks</span>
-              </button>
-            </div>
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#00A896] hover:bg-[#008f80] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save Marks</span>
+            </button>
+            </>
           )}
         </div>
-
-        {/* Notices */}
-        {saveSuccessNotice && (
-          <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Marks successfully updated and saved to offline database!</span>
-          </div>
-        )}
-
-        {validationWarnings.length > 0 && (
-          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium rounded-xl space-y-1">
-            <div className="flex items-center gap-1.5 font-bold">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <span>Score Validation Warnings:</span>
-            </div>
-            {validationWarnings.slice(0, 3).map((w, idx) => (
-              <p key={idx} className="text-[11px] pl-5">
-                &bull; {w}
-              </p>
-            ))}
-            {validationWarnings.length > 3 && (
-              <p className="text-[11px] pl-5 font-semibold">
-                +{validationWarnings.length - 3} more warnings.
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Spreadsheet Mark Entry Table (When Subject is selected) */}
-      {activeSubject && activeClass && (
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-5 sm:p-6 no-print">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-2">
-            <div>
-              <span className="text-xs font-bold text-[#00A896] uppercase tracking-wider">
-                Mark Entry Spreadsheet
-              </span>
-              <h3 className="text-lg font-black text-[#003366]">
-                {activeSubject.name} &mdash; {selectedSemester} ({selectedYear})
-              </h3>
-            </div>
-            <span className="text-xs font-bold px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
-              Max Total: {activeSubjectTotalMax} Marks
-            </span>
+      {saveSuccessNotice && (
+        <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>Marks successfully updated and saved!</span>
+        </div>
+      )}
+
+      {validationWarnings.length > 0 && (
+        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 font-bold">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span>Score Validation Warnings:</span>
           </div>
+          {validationWarnings.slice(0, 3).map((w, idx) => (
+            <p key={idx} className="text-[11px] pl-5">
+              &bull; {w}
+            </p>
+          ))}
+          {validationWarnings.length > 3 && (
+            <p className="text-[11px] pl-5 font-semibold">
+              +{validationWarnings.length - 3} more warnings.
+            </p>
+          )}
+        </div>
+      )}
 
-          <div
-            className={`mt-4 border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
-              isDragging ? 'border-amber-500 bg-amber-50' : 'border-gray-300 bg-gray-50'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div className="flex flex-col items-center justify-center space-y-2">
-              <div className="p-3 bg-white rounded-full shadow-xs border border-gray-100">
-                <Upload className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="text-sm font-semibold text-gray-700">
-                Drag and drop your marks CSV file here
-              </div>
-              <div className="text-xs text-gray-500">
-                or click "Upload Marks (CSV)" above to browse
-              </div>
+      {!isSubjectApproved && (
+        <div
+          className={`mt-4 border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
+            isDragging ? 'border-amber-500 bg-amber-50' : 'border-gray-300 bg-gray-50'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <div className="flex flex-col items-center justify-center space-y-2">
+            <div className="p-3 bg-white rounded-full shadow-xs border border-gray-100 cursor-pointer" onClick={() => bulkUploadRef.current?.click()}>
+              <Upload className="w-6 h-6 text-gray-400" />
             </div>
-          </div>
-
-          <div className="overflow-x-auto mt-4">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-100/80 text-[#003366] text-xs font-bold uppercase tracking-wider border-b border-gray-200">
-                  <th className="py-3 px-3 w-16 text-center">Roll</th>
-                  <th className="py-3 px-4 min-w-[160px]">Student Name</th>
-                  {activeSubject.assessments.map((a) => (
-                    <th key={a.name} className="py-3 px-3 text-center min-w-[120px]">
-                      <div>{a.name}</div>
-                      <div className="text-[10px] text-gray-500 font-normal">
-                        Max {a.maxScore}
-                      </div>
-                    </th>
-                  ))}
-                  <th className="py-3 px-4 text-center min-w-[100px] bg-blue-50/80 text-[#003366]">
-                    Total (Max {activeSubjectTotalMax})
-                  </th>
-                  <th className="py-3 px-3 text-center w-24 text-gray-500 font-semibold text-[11px]">
-                    Report Card
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {activeClass.students.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={4 + activeSubject.assessments.length}
-                      className="py-8 text-center text-gray-400 text-sm"
-                    >
-                      No students found in this class. Add students from the Classes tab.
-                    </td>
-                  </tr>
-                ) : (
-                  [...activeClass.students]
-                    .sort((a, b) => a.rollNo - b.rollNo)
-                    .map((student) => {
-                      const studentScores = marksBuffer[student.id] || {};
-                      let liveRowTotal = 0;
-
-                      return (
-                        <tr key={student.id} className="hover:bg-gray-50/50 transition">
-                          <td className="py-2.5 px-3 text-center font-bold text-gray-600">
-                            {student.rollNo}
-                          </td>
-                          <td className="py-2.5 px-4 font-semibold text-gray-900">
-                            {student.name}
-                          </td>
-                          {activeSubject.assessments.map((a) => {
-                            const val = studentScores[a.name];
-                            const numVal = typeof val === 'number' ? val : 0;
-                            liveRowTotal += numVal;
-                            const isExceeded = numVal > a.maxScore;
-
-                            return (
-                              <td key={a.name} className="py-2.5 px-3 text-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={a.maxScore}
-                                  value={val === undefined ? '' : val}
-                                  onChange={(e) =>
-                                    handleMarkChange(student.id, a.name, e.target.value)
-                                  }
-                                  className={`w-20 px-2 py-1.5 text-center text-sm font-bold rounded-lg border outline-none transition ${
-                                    isExceeded
-                                      ? 'border-red-500 bg-red-50 text-red-700'
-                                      : 'border-gray-300 focus:border-[#00A896] bg-white text-gray-800'
-                                  }`}
-                                  placeholder="0"
-                                />
-                              </td>
-                            );
-                          })}
-                          <td className="py-2.5 px-4 text-center font-black text-base bg-blue-50/40 text-[#003366]">
-                            {liveRowTotal}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPrintStudentId(student.id);
-                                setIsPrintModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-[#003366] hover:text-white text-gray-700 text-xs font-bold transition cursor-pointer"
-                              title={`Print Report Card for ${student.name}`}
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Print</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                )}
-              </tbody>
-            </table>
+            <div className="text-sm font-semibold text-gray-700">
+              Drag and drop your marks CSV file here
+            </div>
+            <div className="text-xs text-gray-500">
+              or click the icon above to browse
+            </div>
+            <button
+              type="button"
+              onClick={() => activeClass && activeSubject && downloadMarkTemplateCSV(activeClass, activeSubject)}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-100 text-xs font-semibold text-gray-600 transition cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download Marklist Template CSV
+            </button>
+            <input
+              type="file"
+              accept=".csv"
+              ref={bulkUploadRef}
+              onChange={handleBulkMarkUpload}
+              className="hidden"
+            />
           </div>
         </div>
       )}
 
+      <div className="overflow-x-auto mt-4">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-100/80 text-[#003366] text-xs font-bold uppercase tracking-wider border-b border-gray-200">
+              <th className="py-3 px-3 w-16 text-center">Roll</th>
+              <th className="py-3 px-4 min-w-[160px]">Student Name</th>
+              {activeSubject?.assessments.map((a) => (
+                <th key={a.name} className="py-3 px-3 text-center min-w-[120px]">
+                  <div>{a.name}</div>
+                  <div className="text-[10px] text-gray-500 font-normal">
+                    Max {a.maxScore}
+                  </div>
+                </th>
+              ))}
+              <th className="py-3 px-4 text-center min-w-[100px] bg-blue-50/80 text-[#003366]">
+                Total (Max {activeSubjectTotalMax})
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {!activeClass || activeClass.students.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={3 + (activeSubject?.assessments.length || 0)}
+                  className="py-8 text-center text-gray-400 text-sm"
+                >
+                  No students found in this class.
+                </td>
+              </tr>
+            ) : (
+              [...activeClass.students]
+                .sort((a, b) => a.rollNo - b.rollNo)
+                .map((student) => {
+                  const studentScores = marksBuffer[student.id] || {};
+                  let liveRowTotal = 0;
+
+                  return (
+                    <tr key={student.id} className="hover:bg-gray-50/50 transition">
+                      <td className="py-2.5 px-3 text-center font-bold text-gray-600">
+                        {student.rollNo}
+                      </td>
+                      <td className="py-2.5 px-4 font-semibold text-gray-900">
+                        {student.name}
+                      </td>
+                      {activeSubject?.assessments.map((a) => {
+                        const val = studentScores[a.name];
+                        const numVal = typeof val === 'number' ? val : 0;
+                        liveRowTotal += numVal;
+                        const isExceeded = numVal > a.maxScore;
+
+                        return (
+                          <td key={a.name} className="py-2.5 px-3 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max={a.maxScore}
+                              value={val === undefined ? '' : val}
+                              disabled={isSubjectApproved}
+                              onChange={(e) =>
+                                handleMarkChange(student.id, a.name, e.target.value)
+                              }
+                              className={`w-20 px-2 py-1.5 text-center text-sm font-bold rounded-lg border outline-none transition ${
+                                isExceeded
+                                  ? 'border-red-500 bg-red-50 text-red-700'
+                                  : 'border-gray-300 focus:border-[#00A896] bg-white text-gray-800 disabled:bg-gray-50'
+                              }`}
+                              placeholder="0"
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="py-2.5 px-4 text-center font-black text-base bg-blue-50/40 text-[#003366]">
+                        {liveRowTotal}
+                      </td>
+                    </tr>
+                  );
+                })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderApprovalsView = () => {
+    if (!activeClass) return null;
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-5 sm:p-6 no-print">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-2 mb-6">
+          <div>
+            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+              Approval Workflow
+            </span>
+            <h3 className="text-lg font-black text-[#003366]">
+              {activeClass.name} &mdash; {selectedSemester} ({selectedYear})
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Review and approve subject marks entered by teachers.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {activeClass.subjects.map(subject => {
+            // Check submission rate
+            let hasMarks = 0;
+            let isApproved = false;
+            let isRejected = false;
+            
+            activeClass.students.forEach(student => {
+              const res = student.results?.[selectedYear]?.[selectedSemester]?.[subject.name];
+              if (res && res.total > 0) hasMarks++;
+              if (res?.approved === true) isApproved = true;
+              if (res?.approved === false) isRejected = true;
+            });
+            
+            const totalStudents = activeClass.students.length;
+            const progress = totalStudents > 0 ? (hasMarks / totalStudents) * 100 : 0;
+            
+            let statusBadge = (
+              <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold border border-gray-200">
+                Pending Entry
+              </span>
+            );
+            
+            if (isApproved) {
+              statusBadge = (
+                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Approved
+                </span>
+              );
+            } else if (isRejected) {
+              statusBadge = (
+                <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold border border-red-200 flex items-center gap-1">
+                  <XCircle className="w-3 h-3" /> Rejected
+                </span>
+              );
+            } else if (progress === 100) {
+              statusBadge = (
+                <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold border border-blue-200 flex items-center gap-1">
+                  Ready for Review
+                </span>
+              );
+            }
+
+            return (
+              <div key={subject.name} className="border border-gray-200 rounded-xl p-4 flex flex-col hover:shadow-md transition bg-gray-50">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-gray-900 truncate">{subject.name}</h4>
+                  {statusBadge}
+                </div>
+                
+                <div className="text-xs text-gray-500 mb-4 flex-1">
+                  <div className="flex justify-between mb-1">
+                    <span>Submission Progress</span>
+                    <span className="font-semibold text-gray-700">{hasMarks}/{totalStudents}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                  </div>
+                </div>
+
+                
+                <div className="flex mt-auto pt-3 border-t border-gray-200">
+                  <button 
+                    onClick={() => setReviewSubject(subject)}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>{isApproved || isRejected ? 'View Submission Details' : 'Review & Process Marks'}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {activeClass.subjects.length === 0 && (
+            <div className="col-span-full py-8 text-center text-gray-500 text-sm">
+              No subjects assigned to this class.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Configuration Toolbar */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-5 sm:p-6 no-print">
+        
+        {/* Module Sub-Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-4">
+          <button
+            onClick={() => setSubTab('mark_entry')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+              subTab === 'mark_entry'
+                ? 'bg-[#003366] text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm'
+            }`}
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Mark List & Roster</span>
+          </button>
+          
+          {canApprove && (
+            <>
+              <button
+                onClick={() => setSubTab('approvals')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  subTab === 'approvals'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Approvals Workflow</span>
+              </button>
+              <button
+                onClick={() => setSubTab('reports')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  subTab === 'reports'
+                    ? 'bg-[#FFC300] text-[#003366] shadow-md ring-2 ring-[#FFC300]/50 ring-offset-1'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm'
+                }`}
+              >
+                <FileCheck2 className="w-4 h-4" />
+                <span>Reports & Master Sheet</span>
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Select Class
+            </label>
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 outline-none focus:border-[#00A896] transition"
+            >
+              {visibleClasses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              {visibleClasses.length === 0 && <option value="">No classes available</option>}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Academic Year
+            </label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 outline-none focus:border-[#00A896] transition"
+            >
+              {settings.academicYears?.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+              {!settings.academicYears?.includes(selectedYear) && (
+                <option value={selectedYear}>{selectedYear}</option>
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Term / Semester
+            </label>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 outline-none focus:border-[#00A896] transition"
+            >
+              {settings.semesters?.map((sem) => (
+                <option key={sem} value={sem}>
+                  {sem}
+                </option>
+              ))}
+              {!settings.semesters?.includes(selectedSemester) && (
+                <option value={selectedSemester}>{selectedSemester}</option>
+              )}
+            </select>
+          </div>
+
+          {subTab === 'mark_entry' && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                Subject
+              </label>
+              <select
+                value={selectedSubjectName}
+                onChange={(e) => setSelectedSubjectName(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-[#003366] outline-none focus:border-[#00A896] transition"
+              >
+                {availableSubjects.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+                {availableSubjects.length === 0 && (
+                  <option value="">No subjects assigned</option>
+                )}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {subTab === 'mark_entry' && renderMarkEntryView()}
+      
+      {subTab === 'approvals' && renderApprovalsView()}
+
       {/* Reports and Master Sheet Section */}
-      {activeClass && (
+      {subTab === 'reports' && activeClass && (
         <ReportsView
           appData={appData}
           activeClass={activeClass}
@@ -566,8 +732,8 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
         />
       )}
 
-      {/* Dedicated Print Report Card Modal with CSS media print queries */}
-      {activeClass && (
+      {/* Dedicated Print Report Card Modal */}
+      {subTab === 'reports' && activeClass && (
         <PrintReportCardModal
           isOpen={isPrintModalOpen}
           onClose={() => setIsPrintModalOpen(false)}
@@ -579,6 +745,16 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
           onEditRemarksAttendance={onEditRemarksAttendance}
         />
       )}
+      <ReviewMarksModal
+        isOpen={!!reviewSubject}
+        onClose={() => setReviewSubject(null)}
+        subject={reviewSubject}
+        activeClass={activeClass}
+        year={selectedYear}
+        semester={selectedSemester}
+        onApprove={onApproveMarks}
+        onReject={onRejectMarks}
+      />
     </div>
   );
 };

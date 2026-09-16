@@ -102,6 +102,11 @@ html.dark body {
   }
 
   /* Prevent awkward page break splits */
+  .print-page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
   .printable-report-card tr,
   .printable-report-card .print-keep-together,
   .printable-report-card .signature-block,

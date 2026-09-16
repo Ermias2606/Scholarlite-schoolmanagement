@@ -29,10 +29,10 @@ interface ClassesTabProps {
   onDeleteClass: (classId: string) => void;
   onSaveSubject: (classId: string, subject: Subject, originalName?: string) => void;
   onDeleteSubject: (classId: string, subjectName: string) => void;
-  onAddStudent: (classId: string, student: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }) => void;
-  onUpdateStudent: (classId: string, student: { id: string; rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }) => void;
+  onAddStudent: (classId: string, student: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other'; parentName?: string; parentContact?: string; }) => void;
+  onUpdateStudent: (classId: string, student: { id: string; rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other'; parentName?: string; parentContact?: string; }) => void;
   onDeleteStudent: (classId: string, studentId: string) => void;
-  onBulkUploadStudents: (classId: string, students: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }[]) => void;
+  onBulkUploadStudents: (classId: string, students: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other'; parentName?: string; parentContact?: string; }[]) => void;
   onEditRemarksAttendance?: (student: Student, className: string) => void;
 }
 
@@ -56,6 +56,8 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
   const [newRollNo, setNewRollNo] = useState<number | ''>('');
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentGender, setNewStudentGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [newParentName, setNewParentName] = useState('');
+  const [newParentContact, setNewParentContact] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isPrintIdModalOpen, setIsPrintIdModalOpen] = useState(false);
@@ -457,6 +459,14 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                   <div className="text-xs text-gray-500">
                     or click "Bulk Upload (CSV)" above to browse
                   </div>
+                  <button
+                    type="button"
+                    onClick={downloadRosterTemplateCSV}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-100 text-xs font-semibold text-gray-600 transition cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download Student Template CSV
+                  </button>
                 </div>
               </div>
 
@@ -486,7 +496,25 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                     required
                   />
                 </div>
-                <div className="w-full md:w-32">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={newParentName}
+                    onChange={(e) => setNewParentName(e.target.value)}
+                    placeholder="Parent/Guardian Name"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs font-medium outline-none focus:border-[#00A896]"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={newParentContact}
+                    onChange={(e) => setNewParentContact(e.target.value)}
+                    placeholder="Parent Contact (Phone)"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs font-medium outline-none focus:border-[#00A896]"
+                  />
+                </div>
+                <div className="w-full md:w-28">
                   <select
                     value={newStudentGender}
                     onChange={(e) => setNewStudentGender(e.target.value as 'Male' | 'Female' | 'Other')}
@@ -530,6 +558,7 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                       <th className="py-3 px-4 w-20 text-center">Roll No</th>
                       <th className="py-3 px-4 w-32">Unique ID</th>
                       <th className="py-3 px-4">Student Name</th>
+                      <th className="py-3 px-4">Guardian Info</th>
                       <th className="py-3 px-4 text-center">Gender</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -537,7 +566,7 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                   <tbody className="divide-y divide-gray-100">
                     {filteredStudents.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-gray-400 text-sm">
+                        <td colSpan={6} className="py-8 text-center text-gray-400 text-sm">
                           {activeClass.students.length === 0
                             ? 'No students enrolled yet. Add a student or upload a CSV above.'
                             : 'No students matched your search.'}
@@ -553,6 +582,10 @@ export const ClassesTab: React.FC<ClassesTabProps> = ({
                             {s.admissionNumber || '-'}
                           </td>
                           <td className="py-3 px-4 font-semibold text-gray-900">{s.name}</td>
+                          <td className="py-3 px-4 text-xs">
+                            <div className="font-medium text-gray-700">{s.parentName || '-'}</div>
+                            <div className="text-gray-500">{s.parentContact || ''}</div>
+                          </td>
                           <td className="py-3 px-4 text-center">
                             <span
                               className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${

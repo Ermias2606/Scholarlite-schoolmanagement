@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import fs from 'fs';
+
+const modalCode = `import React, { useState } from 'react';
 import { X, Printer, LayoutGrid, CheckSquare, Settings2 } from 'lucide-react';
 import { SchoolClass, Settings } from '../types';
 import { IdCardTemplate } from './IdCardTemplate';
@@ -44,19 +46,19 @@ export const PrintIdCardsModal: React.FC<PrintIdCardsModalProps> = ({
             <div className="flex items-center p-1 bg-gray-100 rounded-xl border border-gray-200 mr-2">
               <button
                 onClick={() => setPrintMode('front')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${printMode === 'front' ? 'bg-white shadow text-[#003366]' : 'text-gray-500 hover:text-gray-700'}`}
+                className={\`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors \${printMode === 'front' ? 'bg-white shadow text-[#003366]' : 'text-gray-500 hover:text-gray-700'}\`}
               >
                 Fronts Only
               </button>
               <button
                 onClick={() => setPrintMode('back')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${printMode === 'back' ? 'bg-white shadow text-[#003366]' : 'text-gray-500 hover:text-gray-700'}`}
+                className={\`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors \${printMode === 'back' ? 'bg-white shadow text-[#003366]' : 'text-gray-500 hover:text-gray-700'}\`}
               >
                 Backs Only
               </button>
               <button
                 onClick={() => setPrintMode('both')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${printMode === 'both' ? 'bg-white shadow text-[#003366]' : 'text-gray-500 hover:text-gray-700'}`}
+                className={\`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors \${printMode === 'both' ? 'bg-white shadow text-[#003366]' : 'text-gray-500 hover:text-gray-700'}\`}
               >
                 Front & Back
               </button>
@@ -111,3 +113,6 @@ export const PrintIdCardsModal: React.FC<PrintIdCardsModalProps> = ({
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/PrintIdCardsModal.tsx', modalCode);
