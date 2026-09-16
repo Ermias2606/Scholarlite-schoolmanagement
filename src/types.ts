@@ -114,33 +114,16 @@ export interface SchoolEvent {
   description?: string;
 }
 
-export interface Department {
-  id: string;
-  name: string;
-  headId?: string; // User ID
-  description?: string;
-}
-
-export interface Branch {
-  id: string;
-  name: string;
-  location?: string;
-  branchHeadId?: string; // User ID
-}
-
 export interface SchoolLevel {
   id: string;
   admissionNumber?: string;
   name: string;
   order: number;
-  headId?: string; // User ID
 }
 
 export interface AppData {
   settings: Settings;
   levels?: SchoolLevel[];
-  departments?: Department[];
-  branches?: Branch[];
   classes: SchoolClass[];
   events?: SchoolEvent[];
   users: UserProfile[];

@@ -3,57 +3,45 @@ import re
 with open('src/types.ts', 'r') as f:
     content = f.read()
 
-# 1. Add Department and Branch
-new_interfaces = """
-export interface Department {
-  id: string;
-  name: string;
-  headId?: string; // User ID
-  description?: string;
-}
-
-export interface Branch {
-  id: string;
-  name: string;
-  location?: string;
-  branchHeadId?: string; // User ID
-}
-
-export interface SchoolLevel {
+old_profile = """export interface UserProfile {
   id: string;
   admissionNumber?: string;
   name: string;
-  order: number;
-  headId?: string; // User ID
-}
-"""
-
-content = re.sub(r'export interface SchoolLevel \{.*?\}', new_interfaces.strip(), content, flags=re.DOTALL)
-
-# 2. Add to AppData
-old_appdata = """export interface AppData {
-  settings: Settings;
-  levels?: SchoolLevel[];
-  classes: SchoolClass[];
-  events?: SchoolEvent[];
-  users: UserProfile[];
-  auditLogs?: AuditLog[];
-  currentUser?: UserProfile;
+  role: UserRole; // Primary role
+  roles?: UserRole[]; // All assigned roles
+  username: string;
+  password: string;
+  email?: string;
+  title?: string;
+  assignedClassId?: string;
+  assignedClassIds?: string[];
+  assignedSubjects?: string[];
+  assignedStudentId?: string;
 }"""
 
-new_appdata = """export interface AppData {
-  settings: Settings;
-  levels?: SchoolLevel[];
-  departments?: Department[];
-  branches?: Branch[];
-  classes: SchoolClass[];
-  events?: SchoolEvent[];
-  users: UserProfile[];
-  auditLogs?: AuditLog[];
-  currentUser?: UserProfile;
+new_profile = """export interface UserProfile {
+  id: string;
+  admissionNumber?: string;
+  name: string;
+  role: UserRole; // Primary role
+  roles?: UserRole[]; // All assigned roles
+  username: string;
+  password: string;
+  email?: string;
+  title?: string;
+  assignedClassId?: string;
+  assignedClassIds?: string[];
+  assignedSubjects?: string[];
+  assignedStudentId?: string;
+  // HCM Features
+  phone?: string;
+  department?: string;
+  joinDate?: string;
+  staffStatus?: 'active' | 'leave' | 'terminated';
+  address?: string;
 }"""
 
-content = content.replace(old_appdata, new_appdata)
+content = content.replace(old_profile, new_profile)
 
 with open('src/types.ts', 'w') as f:
     f.write(content)

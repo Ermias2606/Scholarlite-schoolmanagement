@@ -59,15 +59,6 @@ export default function App() {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  
-  const routeUserToTab = (role: string) => {
-    if (['class_teacher', 'subject_teacher'].includes(role)) {
-      setActiveTab('teacher_dashboard');
-    } else {
-      setActiveTab('overview');
-    }
-  };
-
   const [showSaveToast, setShowSaveToast] = useState(false);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -123,7 +114,6 @@ export default function App() {
         }
         
         setCurrentUser(profile);
-        routeUserToTab(profile.role);
         setSelectedClassId(data.classes[0]?.id || null);
         setView('dashboard');
       } else {
@@ -188,7 +178,6 @@ export default function App() {
   // Switch persona and keep in appData
   const handleSelectUser = (user: UserProfile) => {
     setCurrentUser(user);
-    routeUserToTab(user.role);
     updateAppData((prev) => ({
       ...prev,
       currentUser: user,
@@ -543,7 +532,7 @@ export default function App() {
     { id: 'manage_subjects', label: 'Subjects', icon: BookOpen, roles: ['super_admin', 'school_admin', 'admin'] },
     { id: 'manage_students', label: 'Students', icon: Users, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher'] },
     { id: 'manage_staff', label: 'Staff', icon: ShieldCheck, roles: ['super_admin', 'school_admin', 'admin'] },
-    { id: 'manage_levels', label: 'Organization', icon: Layers, roles: ['super_admin', 'admin'] },
+    { id: 'manage_levels', label: 'School Levels', icon: Layers, roles: ['super_admin'] },
     { id: 'results', label: 'Results & Reports', icon: FileSpreadsheet, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, roles: ['super_admin', 'school_admin', 'admin'] },
   ] as const;
@@ -795,9 +784,10 @@ export default function App() {
                 {activeTab === 'manage_levels' && (
                   <ManageLevelsTab
                     appData={appData}
-                    onUpdateLevels={(levels) => updateAppData(prev => ({ ...prev, levels }))}
-                    onUpdateDepartments={(departments) => updateAppData(prev => ({ ...prev, departments }))}
-                    onUpdateBranches={(branches) => updateAppData(prev => ({ ...prev, branches }))}
+                    
+                    onUpdateLevels={(levels) => {
+                      updateAppData((prev) => ({ ...prev, levels }));
+                    }}
                     onAddAuditLog={handleAddAuditLog}
                   />
                 )}
