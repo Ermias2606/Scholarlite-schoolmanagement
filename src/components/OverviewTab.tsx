@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   UserCheck,
+  Building2,
 } from 'lucide-react';
 import { AppData, UserProfile, SchoolClass } from '../types';
 import { calculateTermAnalysis, getGradeInfo } from '../utils/calculations';
@@ -21,7 +22,7 @@ import { calculateTermAnalysis, getGradeInfo } from '../utils/calculations';
 interface OverviewTabProps {
   appData: AppData;
   currentUser: UserProfile;
-  onNavigateTab: (tab: 'classes' | 'results' | 'settings') => void;
+  onNavigateTab: (tab: 'classes' | 'results' | 'settings' | 'registrar') => void;
   onSelectClass?: (classId: string) => void;
 }
 
@@ -164,6 +165,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <FileSpreadsheet className="w-4 h-4" />
               <span>Enter Marks &amp; Reports</span>
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => onNavigateTab('registrar')}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#00A896] hover:bg-[#008f80] text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer"
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Office of the Registrar</span>
+              </button>
+            )}
             {currentUser.role === 'admin' && (
               <button
                 onClick={() => onNavigateTab('classes')}

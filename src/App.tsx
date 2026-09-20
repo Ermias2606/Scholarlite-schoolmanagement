@@ -15,6 +15,7 @@ import {
   Building2,
   BookOpen,
   Layers,
+  Network,
 } from 'lucide-react';
 import {
   AppData,
@@ -32,6 +33,7 @@ import { createAuditLog } from './utils/audit';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { ManageClassesTab } from './components/ManageClassesTab';
+import { AdminSchoolClassManagementTab } from './components/AdminSchoolClassManagementTab';
 import { ManageSubjectsTab } from './components/ManageSubjectsTab';
 import { ManageStudentsTab } from './components/ManageStudentsTab';
 import { ManageStaffTab } from './components/ManageStaffTab';
@@ -48,6 +50,8 @@ import { TeacherDashboardTab } from './components/TeacherDashboardTab';
 import { Calendar } from 'lucide-react';
 import { RoleSwitcherModal } from './components/RoleSwitcherModal';
 import { EditRemarksAttendanceModal } from './components/EditRemarksAttendanceModal';
+import { RegistrarTab } from './components/RegistrarTab';
+import { RoleTransitionLoader } from './components/RoleTransitionLoader';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { useTheme } from './utils/theme';
 
@@ -55,9 +59,14 @@ export default function App() {
   useTheme(); // Initialize global theme on app load
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
-  const [activeTab, setActiveTab] = useState<'overview' | 'teacher_dashboard' | 'manage_classes' | 'manage_subjects' | 'manage_students' | 'manage_staff' | 'manage_levels' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'registrar' | 'teacher_dashboard' | 'manage_classes' | 'manage_subjects' | 'manage_students' | 'manage_staff' | 'manage_levels' | 'classes' | 'results' | 'calendar' | 'settings'>('overview');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [roleTransitionState, setRoleTransitionState] = useState<{
+    user: UserProfile;
+    targetDashboard: string;
+    targetTab?: typeof activeTab;
+  } | null>(null);
 
   const [showSaveToast, setShowSaveToast] = useState(false);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -175,14 +184,51 @@ export default function App() {
     }));
   };
 
-  // Switch persona and keep in appData
-  const handleSelectUser = (user: UserProfile) => {
+  // Switch persona and keep in appData with smooth role-permission loading
+  const handleSelectUser = (user: UserProfile, targetTabOverride?: typeof activeTab) => {
+    let targetTab: typeof activeTab = 'overview';
+    let targetLabel = 'Executive Overview Hub';
+
+    if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'school_admin') {
+      targetTab = targetTabOverride || (activeTab === 'registrar' ? 'registrar' : 'overview');
+      targetLabel = targetTab === 'registrar' ? 'Registrar Office & Academic Registry' : 'Executive Overview Hub';
+    } else if (user.role === 'class_teacher') {
+      targetTab = 'teacher_dashboard';
+      targetLabel = 'Class Teacher Dashboard & Roster';
+    } else if (user.role === 'subject_teacher') {
+      targetTab = 'teacher_dashboard';
+      targetLabel = 'Subject Faculty Gradebook & Entry';
+    } else if (user.role === 'student') {
+      targetTab = 'overview';
+      targetLabel = 'Student & Parent Academic Portal';
+    }
+
+    setRoleTransitionState({
+      user,
+      targetDashboard: targetLabel,
+      targetTab,
+    });
+    setView('dashboard');
+  };
+
+  const handleCompleteRoleTransition = () => {
+    if (!roleTransitionState) return;
+    const { user, targetTab } = roleTransitionState;
     setCurrentUser(user);
+    if (targetTab) {
+      setActiveTab(targetTab);
+    }
+    if (user.assignedClassId) {
+      setSelectedClassId(user.assignedClassId);
+    } else if (user.assignedClassIds && user.assignedClassIds.length > 0) {
+      setSelectedClassId(user.assignedClassIds[0]);
+    }
     updateAppData((prev) => ({
       ...prev,
       currentUser: user,
     }));
-    handleAddAuditLog('Role Switch', `Switched active persona to ${user.name} (${user.role})`);
+    handleAddAuditLog('Role Switch', `Switched active persona to ${user.name} (${user.role}) - Loaded ${targetTab} dashboard`);
+    setRoleTransitionState(null);
   };
 
   // Update staff list
@@ -332,18 +378,28 @@ export default function App() {
 
   const handleAddStudent = (
     classId: string,
-    student: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }
+    student: Partial<Student> & { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }
   ) => {
     updateAppData((prev) => {
       const classes = prev.classes.map((c) => {
         if (c.id !== classId) return c;
-        const newStu = {
-          id: generateId('stu'),
-          admissionNumber: generateAdmissionNumber(),
+        const newStu: Student = {
+          id: student.id || generateId('stu'),
+          admissionNumber: student.admissionNumber || generateAdmissionNumber(),
           rollNo: student.rollNo,
           name: student.name,
           gender: student.gender,
-          results: {},
+          parentName: student.parentName,
+          parentContact: student.parentContact,
+          dob: student.dob,
+          bloodGroup: student.bloodGroup,
+          address: student.address,
+          emergencyContact: student.emergencyContact,
+          status: student.status || 'approved',
+          studentStatus: student.studentStatus || 'active',
+          results: student.results || {},
+          attendance: student.attendance || {},
+          remarks: student.remarks || {},
         };
         return {
           ...c,
@@ -357,7 +413,7 @@ export default function App() {
 
   const handleUpdateStudent = (
     classId: string,
-    updated: { id: string; rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }
+    updated: Partial<Student> & { id: string }
   ) => {
     updateAppData((prev) => {
       const classes = prev.classes.map((c) => {
@@ -367,7 +423,7 @@ export default function App() {
       });
       return { ...prev, classes };
     });
-    handleAddAuditLog('Update Student Record', `Updated profile for ${updated.name}`);
+    handleAddAuditLog('Update Student Record', `Updated profile for ${updated.name || 'student'}`);
   };
 
   const handleDeleteStudent = (classId: string, studentId: string) => {
@@ -384,18 +440,27 @@ export default function App() {
 
   const handleBulkUploadStudents = (
     classId: string,
-    newStudents: { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' }[]
+    newStudents: (Partial<Student> & { rollNo: number; name: string; gender: 'Male' | 'Female' | 'Other' })[]
   ) => {
     updateAppData((prev) => {
       const classes = prev.classes.map((c) => {
         if (c.id !== classId) return c;
-        const formatted = newStudents.map((s) => ({
-          id: generateId('stu'),
-          admissionNumber: generateAdmissionNumber(),
+        const formatted: Student[] = newStudents.map((s) => ({
+          id: s.id || generateId('stu'),
+          admissionNumber: s.admissionNumber || generateAdmissionNumber(),
           rollNo: s.rollNo,
           name: s.name,
           gender: s.gender,
-          results: {},
+          parentName: s.parentName,
+          parentContact: s.parentContact,
+          dob: s.dob,
+          address: s.address,
+          bloodGroup: s.bloodGroup,
+          status: s.status || 'approved',
+          studentStatus: s.studentStatus || 'active',
+          results: s.results || {},
+          attendance: s.attendance || {},
+          remarks: s.remarks || {},
         }));
         return {
           ...c,
@@ -404,7 +469,7 @@ export default function App() {
       });
       return { ...prev, classes };
     });
-    handleAddAuditLog('Bulk Student Upload', `Imported ${newStudents.length} students via CSV`);
+    handleAddAuditLog('Bulk Student Upload', `Imported ${newStudents.length} students via CSV with parent records`);
   };
 
   // --- Handlers for Marks ---
@@ -503,11 +568,11 @@ export default function App() {
 
           
           // Preserve approved status if updating an existing entry
-          const existingEntry = results[year][semester][subjectName] || {};
+          const existingEntry = results[year][semester][subjectName];
           results[year][semester][subjectName] = {
             ...entry,
-            approved: existingEntry.approved,
-            approvedBy: existingEntry.approvedBy,
+            approved: existingEntry?.approved,
+            approvedBy: existingEntry?.approvedBy,
           };
 
           return {
@@ -671,12 +736,13 @@ export default function App() {
   // Define tab navigation based on current role permissions
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: Home, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
+    { id: 'registrar', label: 'Registrar Office', icon: Building2, roles: ['super_admin', 'school_admin', 'admin'] },
     { id: 'teacher_dashboard', label: 'Teacher Dashboard', icon: UserCheck, roles: ['class_teacher', 'subject_teacher'] },
     { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
     { id: 'manage_classes', label: 'Classes', icon: Building2, roles: ['super_admin', 'school_admin', 'admin'] },
     { id: 'manage_subjects', label: 'Subjects', icon: BookOpen, roles: ['super_admin', 'school_admin', 'admin'] },
     { id: 'manage_students', label: 'Students', icon: Users, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher'] },
-    { id: 'manage_staff', label: 'Staff', icon: ShieldCheck, roles: ['super_admin', 'school_admin', 'admin'] },
+    { id: 'manage_staff', label: 'School Organization', icon: Network, roles: ['super_admin', 'school_admin', 'admin'] },
     { id: 'manage_levels', label: 'School Levels', icon: Layers, roles: ['super_admin'] },
     { id: 'results', label: 'Results & Reports', icon: FileSpreadsheet, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, roles: ['super_admin', 'school_admin', 'admin'] },
@@ -848,6 +914,19 @@ export default function App() {
                   />
                 )}
 
+                {activeTab === 'registrar' && (
+                  <RegistrarTab
+                    appData={appData}
+                    currentUser={currentUser}
+                    onAddStudent={handleAddStudent}
+                    onUpdateStudent={handleUpdateStudent}
+                    onDeleteStudent={handleDeleteStudent}
+                    onBulkUploadStudents={handleBulkUploadStudents}
+                    onUpdateUsers={handleUpdateUsers}
+                    onAddAuditLog={handleAddAuditLog}
+                  />
+                )}
+
                 {activeTab === 'teacher_dashboard' && (
                   <TeacherDashboardTab
                     appData={appData}
@@ -886,17 +965,15 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'manage_classes' && (
-                  <ManageClassesTab
+                  <AdminSchoolClassManagementTab
                     appData={appData}
-                    
-                    onAddClass={(name, levelId) => {
-                      updateAppData(prev => ({
-                        ...prev,
-                        classes: [...prev.classes, { id: generateId('class'), name, levelId, subjects: [], students: [] }]
-                      }));
-                      handleAddAuditLog('Add Class', `Added class: ${name}`);
+                    onUpdateClasses={(classes) => {
+                      updateAppData((prev) => ({ ...prev, classes }));
                     }}
-                    onDeleteClass={handleDeleteClass}
+                    onUpdateLevels={(levels) => {
+                      updateAppData((prev) => ({ ...prev, levels }));
+                    }}
+                    onAddAuditLog={handleAddAuditLog}
                   />
                 )}
                 {activeTab === 'manage_subjects' && (
@@ -982,8 +1059,20 @@ export default function App() {
         onClose={() => setIsRoleSwitcherOpen(false)}
         users={appData.users || []}
         currentUser={currentUser}
-        onSelectUser={handleSelectUser}
+        onSelectUser={(user) => {
+          setIsRoleSwitcherOpen(false);
+          handleSelectUser(user);
+        }}
       />
+
+      {/* Role Transition Loader */}
+      {roleTransitionState && (
+        <RoleTransitionLoader
+          user={roleTransitionState.user}
+          targetDashboard={roleTransitionState.targetDashboard}
+          onComplete={handleCompleteRoleTransition}
+        />
+      )}
 
       {/* Edit Student Remarks & Attendance Modal */}
       <EditRemarksAttendanceModal

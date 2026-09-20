@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppData, UserProfile } from '../types';
-import { StaffManagementSection } from './StaffManagementSection';
+import { SchoolOrgChartTab } from './SchoolOrgChartTab';
 
 interface ManageStaffTabProps {
   appData: AppData;
@@ -10,10 +10,9 @@ interface ManageStaffTabProps {
 
 export const ManageStaffTab: React.FC<ManageStaffTabProps> = ({ appData, onUpdateUsers, onAddAuditLog }) => {
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-      <StaffManagementSection
-        users={appData.users || []}
-        classes={appData.classes}
+    <div className="space-y-6">
+      <SchoolOrgChartTab
+        appData={appData}
         onUpdateUsers={onUpdateUsers}
         onAddAuditLog={onAddAuditLog}
       />

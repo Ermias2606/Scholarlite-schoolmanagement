@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ReportCardTemplate } from './ReportCardTemplate';
 import {
   Printer,
@@ -8,6 +8,8 @@ import {
   Calendar,
   CheckCircle2,
   Award,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { AppData, SchoolClass, Student } from '../types';
 import {
@@ -15,6 +17,8 @@ import {
   calculateFullAnalysis,
   getGradeInfo,
 } from '../utils/calculations';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface PrintReportCardModalProps {
   isOpen: boolean;
@@ -25,6 +29,7 @@ interface PrintReportCardModalProps {
   selectedYear: string;
   selectedSemester: string;
   onEditRemarksAttendance?: (student: Student) => void;
+  onAddAuditLog?: (action: string, details: string) => void;
 }
 
 export const PrintReportCardModal: React.FC<PrintReportCardModalProps> = ({
@@ -36,12 +41,15 @@ export const PrintReportCardModal: React.FC<PrintReportCardModalProps> = ({
   selectedYear: defaultYear,
   selectedSemester: defaultSemester,
   onEditRemarksAttendance,
+  onAddAuditLog,
 }) => {
   const [selectedYear, setSelectedYear] = useState<string>(defaultYear);
   const [selectedSemester, setSelectedSemester] = useState<string>(defaultSemester);
   const [studentId, setStudentId] = useState<string>(
     initialStudentId || activeClass.students[0]?.id || ''
   );
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const reportCardRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
@@ -83,8 +91,34 @@ export const PrintReportCardModal: React.FC<PrintReportCardModalProps> = ({
   };
 
   const handlePrint = () => {
-    // Immediate call to print with media print stylesheet taking over
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!reportCardRef.current) return;
+    try {
+      setIsExportingPdf(true);
+      const canvas = await html2canvas(reportCardRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Report_Card_${rawStudent?.name || 'Student'}_${selectedSemester}.pdf`);
+      if (onAddAuditLog) {
+        onAddAuditLog('Export Report PDF', `Exported report card PDF for ${rawStudent?.name} (${selectedSemester})`);
+      }
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('Failed to export PDF. Please try browser print instead.');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   return (
@@ -104,24 +138,41 @@ export const PrintReportCardModal: React.FC<PrintReportCardModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-bold">Print Student Report Card</h3>
+                <h3 className="text-sm sm:text-base font-bold">Print & Export Report Card</h3>
                 <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-white/20 text-[#FFC300]">
-                  PDF-Ready
+                  PDF Ready
                 </span>
               </div>
               <p className="text-xs text-white/70">
-                Formatted with CSS @media print standards for crisp physical and PDF output
+                Download directly as PDF or print via browser
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleDownloadPdf}
+              disabled={isExportingPdf}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {isExportingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Download PDF</span>
+                </>
+              )}
+            </button>
+            <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFC300] hover:bg-[#ffd140] text-[#003366] text-xs font-black shadow-md transition active:scale-95 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Print / Save PDF</span>
+              <span>Print</span>
             </button>
             <button
               onClick={onClose}
@@ -182,23 +233,26 @@ export const PrintReportCardModal: React.FC<PrintReportCardModalProps> = ({
 
         {/* Printable Report Card Body */}
         <div className="p-4 sm:p-8 max-h-[75vh] overflow-y-auto bg-gray-100/60 print:p-0 print:m-0 print:bg-white print:overflow-visible">
-          {reportCardStudent && rawStudent ? (
-            <ReportCardTemplate
-              appData={appData}
-              activeClass={activeClass}
-              rawStudent={rawStudent}
-              reportCardStudent={reportCardStudent}
-              selectedYear={selectedYear}
-              selectedSemester={selectedSemester}
-              termStudentsLength={termStudents.length}
-              fullStudentsLength={fullAnalysis?.studentData.length || termStudents.length}
-              termMaxScore={termMaxScore}
-              subjects={subjects}
-            />
-          ) : (
-            <div className="p-8 text-center text-gray-500">No student results found for this cohort.</div>
-          )}
-        </div></div>
+          <div ref={reportCardRef} className="bg-white">
+            {reportCardStudent && rawStudent ? (
+              <ReportCardTemplate
+                appData={appData}
+                activeClass={activeClass}
+                rawStudent={rawStudent}
+                reportCardStudent={reportCardStudent}
+                selectedYear={selectedYear}
+                selectedSemester={selectedSemester}
+                termStudentsLength={termStudents.length}
+                fullStudentsLength={fullAnalysis?.studentData.length || termStudents.length}
+                termMaxScore={termMaxScore}
+                subjects={subjects}
+              />
+            ) : (
+              <div className="p-8 text-center text-gray-500">No student results found for this cohort.</div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

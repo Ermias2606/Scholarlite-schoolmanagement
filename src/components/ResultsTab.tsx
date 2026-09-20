@@ -18,6 +18,7 @@ import { downloadMarkTemplateCSV, parseMarksCSV } from '../utils/calculations';
 import { ReportsView } from './ReportsView';
 import { PrintReportCardModal } from './PrintReportCardModal';
 import { ReviewMarksModal } from './ReviewMarksModal';
+import { SaveMarksRemarkModal, StudentMarkDiff } from './SaveMarksRemarkModal';
 
 interface ResultsTabProps {
   appData: AppData;
@@ -78,6 +79,23 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
   const [printStudentId, setPrintStudentId] = useState<string | undefined>(undefined);
   const [isDragging, setIsDragging] = useState(false);
   const [reviewSubject, setReviewSubject] = useState<Subject | null>(null);
+
+  // Mark Revision Modal States
+  const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
+  const [pendingDiffs, setPendingDiffs] = useState<StudentMarkDiff[]>([]);
+  const [pendingResultMap, setPendingResultMap] = useState<
+    Record<
+      string,
+      {
+        marks: Record<string, number>;
+        total: number;
+        previousMarks?: Record<string, number>;
+        editRemark?: string;
+        lastEditedAt?: string;
+      }
+    >
+  >({});
+  const [pendingWarnings, setPendingWarnings] = useState<string[]>([]);
 
   const bulkUploadRef = useRef<HTMLInputElement | null>(null);
 
@@ -152,17 +170,18 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
 
     const warnings: string[] = [];
     const resultMap: Record<string, { marks: Record<string, number>; total: number; previousMarks?: Record<string, number>; editRemark?: string; lastEditedAt?: string }> = {};
-
-    let hasEdits = false;
+    const diffsList: StudentMarkDiff[] = [];
 
     activeClass.students.forEach((student) => {
       const existingEntry = student.results?.[selectedYear]?.[selectedSemester]?.[activeSubject.name];
       const existingMarks = existingEntry?.marks;
+      const oldTotal = existingEntry?.total || 0;
       const studentScores = marksBuffer[student.id] || {};
       const marksClean: Record<string, number> = {};
       let total = 0;
       
       let studentHasEdits = false;
+      const changedAssessments: { name: string; oldMark: number; newMark: number }[] = [];
 
       activeSubject.assessments.forEach((asm) => {
         const val = studentScores[asm.name];
@@ -179,9 +198,22 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
         
         if (existingMarks && existingMarks[asm.name] !== undefined && existingMarks[asm.name] !== num) {
           studentHasEdits = true;
-          hasEdits = true;
+          changedAssessments.push({
+            name: asm.name,
+            oldMark: existingMarks[asm.name],
+            newMark: num,
+          });
         }
       });
+
+      if (studentHasEdits) {
+        diffsList.push({
+          student,
+          changedAssessments,
+          oldTotal,
+          newTotal: total,
+        });
+      }
 
       resultMap[student.id] = {
         marks: marksClean,
@@ -189,25 +221,13 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
         ...(studentHasEdits ? { previousMarks: existingMarks } : {})
       };
     });
-    
-    let globalEditRemark = '';
-    if (hasEdits) {
-      const remark = window.prompt("You are modifying existing marks. Please provide a reason for this change:");
-      if (remark === null) {
-        return; // Cancelled
-      }
-      globalEditRemark = remark || 'No remark provided';
-    }
-    
-    // Apply remark to edited students
-    if (hasEdits) {
-      const now = new Date().toISOString();
-      Object.keys(resultMap).forEach(studentId => {
-        if (resultMap[studentId].previousMarks) {
-          resultMap[studentId].editRemark = globalEditRemark;
-          resultMap[studentId].lastEditedAt = now;
-        }
-      });
+
+    if (diffsList.length > 0) {
+      setPendingDiffs(diffsList);
+      setPendingResultMap(resultMap);
+      setPendingWarnings(warnings);
+      setIsRemarkModalOpen(true);
+      return;
     }
 
     onSaveStudentMarks(
@@ -220,6 +240,32 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
 
     setValidationWarnings(warnings);
     setSaveSuccessNotice(true);
+    setTimeout(() => setSaveSuccessNotice(false), 4000);
+  };
+
+  const handleConfirmRevisionRemark = (remark: string) => {
+    if (!activeClass || !activeSubject) return;
+
+    const now = new Date().toISOString();
+    const finalMap = { ...pendingResultMap };
+    Object.keys(finalMap).forEach((studentId) => {
+      if (finalMap[studentId].previousMarks) {
+        finalMap[studentId].editRemark = remark;
+        finalMap[studentId].lastEditedAt = now;
+      }
+    });
+
+    onSaveStudentMarks(
+      activeClass.id,
+      selectedYear,
+      selectedSemester,
+      activeSubject.name,
+      finalMap
+    );
+
+    setValidationWarnings(pendingWarnings);
+    setSaveSuccessNotice(true);
+    setIsRemarkModalOpen(false);
     setTimeout(() => setSaveSuccessNotice(false), 4000);
   };
 
@@ -754,6 +800,16 @@ export const ResultsTab: React.FC<ResultsTabProps> = ({
         semester={selectedSemester}
         onApprove={onApproveMarks}
         onReject={onRejectMarks}
+      />
+      <SaveMarksRemarkModal
+        isOpen={isRemarkModalOpen}
+        onClose={() => setIsRemarkModalOpen(false)}
+        subjectName={activeSubject?.name || ''}
+        className={activeClass?.name || ''}
+        semester={selectedSemester}
+        year={selectedYear}
+        changedStudents={pendingDiffs}
+        onConfirm={handleConfirmRevisionRemark}
       />
     </div>
   );

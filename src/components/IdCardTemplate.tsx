@@ -63,11 +63,13 @@ export const IdCardTemplate: React.FC<IdCardTemplateProps> = ({
           </div>
           <div className="flex flex-col">
             <span className="text-[6px] font-bold text-gray-400 uppercase">DOB</span>
-            <span className="text-[9px] font-bold text-gray-800">--/--/----</span>
+            <span className="text-[9px] font-bold text-gray-800">{student.dob || '--/--/----'}</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[6px] font-bold text-gray-400 uppercase">Blood Grp</span>
-            <span className="text-[9px] font-bold text-gray-800">N/A</span>
+            <span className="text-[6px] font-bold text-gray-400 uppercase">Parent Contact</span>
+            <span className="text-[9px] font-bold text-gray-800 truncate" title={student.parentContact || student.emergencyContact || 'N/A'}>
+              {student.parentContact || student.emergencyContact || 'N/A'}
+            </span>
           </div>
           <div className="flex flex-col">
             <span className="text-[6px] font-bold text-gray-400 uppercase">Valid Thru</span>

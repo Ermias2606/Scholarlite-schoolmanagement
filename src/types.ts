@@ -8,6 +8,7 @@ export interface AssessmentComponent {
 export interface Subject {
   name: string;
   assessments: AssessmentComponent[];
+  periodsPerWeek?: number;
 }
 
 export interface StudentMarks {
@@ -40,6 +41,12 @@ export interface Student {
   parentName?: string;
   parentContact?: string;
   status?: 'pending' | 'approved';
+  dob?: string;
+  enrollmentDate?: string;
+  studentStatus?: 'active' | 'graduated' | 'transferred' | 'suspended';
+  address?: string;
+  bloodGroup?: string;
+  emergencyContact?: string;
   // results: [academicYear][term][subjectName] -> StudentMarks
   results: Record<string, Record<string, Record<string, StudentMarks>>>;
   // attendance: [academicYear][term] -> StudentAttendance
@@ -79,6 +86,7 @@ export interface UserProfile {
   joinDate?: string;
   staffStatus?: 'active' | 'leave' | 'terminated';
   address?: string;
+  qualification?: string;
 }
 
 export interface AuditLog {
