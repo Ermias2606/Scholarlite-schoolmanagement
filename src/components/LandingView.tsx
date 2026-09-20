@@ -62,7 +62,12 @@ export const LandingView: React.FC<LandingViewProps> = ({
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    if (!cleanUser || !cleanPass) {
+    if (!cleanUser && selectedPortal === 'student') {
+      setLoginError('Please enter your Student Registration ID or Admission Number.');
+      return;
+    }
+
+    if (!cleanUser || (!cleanPass && selectedPortal !== 'student')) {
       setLoginError('Please enter credentials.');
       return;
     }
@@ -73,7 +78,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
       for (const c of appData.classes) {
         const student = c.students.find(s => 
           s.admissionNumber?.toLowerCase() === cleanUser || 
-          s.rollNo.toString() === cleanUser
+          s.rollNo.toString() === cleanUser ||
+          s.id.toLowerCase() === cleanUser
         );
         if (student) {
           matchedStudent = student;
@@ -85,32 +91,34 @@ export const LandingView: React.FC<LandingViewProps> = ({
       let matchedUser = users.find(
         (u) =>
           u.role === 'student' &&
-          ((u.username?.toLowerCase() === cleanUser || u.email?.toLowerCase() === cleanUser) || 
-           (matchedStudent && u.assignedStudentId === matchedStudent.id)) &&
-          (u.password === cleanPass || (!u.password && cleanPass === 'password123'))
+          (
+           (matchedStudent && u.assignedStudentId === matchedStudent.id) ||
+           u.username?.toLowerCase() === cleanUser ||
+           u.id.toLowerCase() === cleanUser
+          )
       );
 
-      if (!matchedUser && matchedStudent && cleanPass === 'password123') {
+      if (!matchedUser && matchedStudent) {
         matchedUser = {
           id: `usr_dyn_${matchedStudent.id}`,
           name: matchedStudent.name,
           role: 'student',
           roles: ['student'],
-          username: cleanUser,
-          password: 'password123',
+          username: matchedStudent.admissionNumber || matchedStudent.rollNo.toString(),
+          password: '',
           title: `Student Portal (${matchedClass?.name})`,
           assignedClassId: matchedClass?.id,
           assignedStudentId: matchedStudent.id
         };
       }
 
-      if (matchedUser) {
+      if (matchedUser && matchedStudent) {
         setAuthSuccessUser(matchedUser);
         setTimeout(() => {
           onEnter(matchedUser);
         }, 800);
       } else {
-        setLoginError('Invalid Student ID or password. (Demo password: password123)');
+        setLoginError('Invalid Student Registration ID or Roll Number. Please check with your school registrar.');
       }
     } else {
       const matchedUser = users.find(
@@ -317,7 +325,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                       <div className="space-y-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
-                            {selectedPortal === 'student' ? 'Student ID / Roll No' : 'Username'}
+                            {selectedPortal === 'student' ? 'Student Registration ID / Admission No' : 'Username'}
                           </label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
@@ -331,40 +339,42 @@ export const LandingView: React.FC<LandingViewProps> = ({
                                 setUsername(e.target.value);
                                 setLoginError(null);
                               }}
-                              placeholder={selectedPortal === 'student' ? "e.g. STD-2024-001" : "Enter username"}
+                              placeholder={selectedPortal === 'student' ? "e.g. STD-2024-001 or Roll No" : "Enter username"}
                               className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition bg-gray-50/50 hover:bg-gray-50"
                             />
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
-                            Password
-                          </label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                              <Lock className="w-4 h-4" />
+                        {selectedPortal !== 'student' && (
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+                              Password
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                                <Lock className="w-4 h-4" />
+                              </div>
+                              <input
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                value={password}
+                                onChange={(e) => {
+                                  setPassword(e.target.value);
+                                  setLoginError(null);
+                                }}
+                                placeholder="Enter your password"
+                                className="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition bg-gray-50/50 hover:bg-gray-50"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-700 transition"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
                             </div>
-                            <input
-                              type={showPassword ? 'text' : 'password'}
-                              required
-                              value={password}
-                              onChange={(e) => {
-                                setPassword(e.target.value);
-                                setLoginError(null);
-                              }}
-                              placeholder="Enter your password"
-                              className="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition bg-gray-50/50 hover:bg-gray-50"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-700 transition"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                       <button

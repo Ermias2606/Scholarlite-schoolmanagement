@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppData, Subject } from '../types';
-import { Plus, Trash2, BookOpen, Edit2, Calendar, Clock, Printer } from 'lucide-react';
+import { Plus, Trash2, BookOpen, Edit2, Calendar, Clock, Printer, Users } from 'lucide-react';
 import { SubjectModal } from './SubjectModal';
 
 interface ManageSubjectsTabProps {
@@ -11,11 +11,12 @@ interface ManageSubjectsTabProps {
 
 export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, onSaveSubject, onDeleteSubject }) => {
   const [selectedClassId, setSelectedClassId] = useState<string>(appData.classes[0]?.id || '');
-  const [activeSubTab, setActiveSubTab] = useState<'subjects' | 'schedules'>('subjects');
+  const [activeSubTab, setActiveSubTab] = useState<'subjects' | 'schedules' | 'workload'>('subjects');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
 
   const activeClass = appData.classes.find(c => c.id === selectedClassId);
+  const staffUsers = (appData.users || []).filter(u => u.role !== 'student');
 
   // Days and periods for timetable generator
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -25,7 +26,6 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
   const generateTimetable = () => {
     if (!activeClass || activeClass.subjects.length === 0) return {};
     
-    // Create an array of subject slots according to periodsPerWeek (default to 4 if not set)
     const slotPool: string[] = [];
     activeClass.subjects.forEach(sub => {
       const p = sub.periodsPerWeek || 4;
@@ -34,7 +34,6 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
       }
     });
 
-    // Shuffle slot pool or distribute across 5 days * 7 periods = 35 slots
     const timetable: Record<string, Record<number, string>> = {};
     let poolIndex = 0;
 
@@ -59,6 +58,34 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
 
   const classTimetable = generateTimetable();
 
+  // Compute teacher workload allocation across all classes
+  const teacherWorkloads = staffUsers.map(teacher => {
+    let totalPeriods = 0;
+    const assignedClassesDetails: { className: string; subjectName: string; periods: number }[] = [];
+
+    appData.classes.forEach(cls => {
+      const isHomeroom = cls.classTeacherId === teacher.id;
+      cls.subjects.forEach(sub => {
+        const isAssigned = isHomeroom || teacher.assignedSubjects?.includes(sub.name) || (cls.subjects.length > 0 && teacher.role === 'subject_teacher');
+        if (isAssigned) {
+          const p = sub.periodsPerWeek || 4;
+          totalPeriods += p;
+          assignedClassesDetails.push({
+            className: cls.name,
+            subjectName: sub.name,
+            periods: p,
+          });
+        }
+      });
+    });
+
+    return {
+      teacher,
+      totalPeriods,
+      assignedClassesDetails,
+    };
+  });
+
   const handleUpdatePeriods = (sub: Subject, periodsCount: number) => {
     if (!activeClass) return;
     onSaveSubject(
@@ -80,11 +107,11 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
           </div>
           <div>
             <h2 className="text-lg font-bold text-[#003366]">Subject & Schedule Management</h2>
-            <p className="text-xs text-gray-500">Configure subjects, weekly periods, and class timetables</p>
+            <p className="text-xs text-gray-500">Configure subjects, weekly periods, class timetables, and teacher allocations</p>
           </div>
         </div>
         
-        {appData.classes.length > 0 && (
+        {appData.classes.length > 0 && activeSubTab !== 'workload' && (
           <select
             value={selectedClassId}
             onChange={(e) => setSelectedClassId(e.target.value)}
@@ -98,10 +125,10 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex bg-gray-100 p-1.5 rounded-2xl max-w-sm text-xs">
+      <div className="flex bg-gray-100 p-1.5 rounded-2xl max-w-lg text-xs">
         <button
           onClick={() => setActiveSubTab('subjects')}
-          className={`flex-1 py-2 px-4 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2 px-3 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
             activeSubTab === 'subjects' ? 'bg-white text-[#003366] shadow-xs' : 'text-gray-600 hover:text-gray-900'
           }`}
         >
@@ -110,21 +137,30 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
         </button>
         <button
           onClick={() => setActiveSubTab('schedules')}
-          className={`flex-1 py-2 px-4 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2 px-3 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
             activeSubTab === 'schedules' ? 'bg-white text-[#003366] shadow-xs' : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <Calendar className="w-3.5 h-3.5" />
           <span>Class Timetable</span>
         </button>
+        <button
+          onClick={() => setActiveSubTab('workload')}
+          className={`flex-1 py-2 px-3 rounded-xl font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'workload' ? 'bg-white text-[#003366] shadow-xs' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Teacher Allocation</span>
+        </button>
       </div>
 
-      {!activeClass ? (
+      {!activeClass && activeSubTab !== 'workload' ? (
         <div className="text-center py-8 text-gray-500">Please create a class first.</div>
       ) : activeSubTab === 'subjects' ? (
         <>
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 text-sm">Subjects &amp; Weekly Periods for {activeClass.name}</h3>
+            <h3 className="font-bold text-gray-800 text-sm">Subjects &amp; Weekly Periods for {activeClass?.name}</h3>
             <button
               onClick={() => {
                 setEditingSubject(null);
@@ -137,7 +173,7 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
           </div>
 
           <div className="space-y-3">
-            {activeClass.subjects.map(sub => {
+            {activeClass?.subjects.map(sub => {
               const maxScore = sub.assessments.reduce((sum, a) => sum + a.maxScore, 0);
               const periodsPerWeek = sub.periodsPerWeek || 4;
               return (
@@ -195,19 +231,19 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
                 </div>
               );
             })}
-            {activeClass.subjects.length === 0 && (
+            {activeClass?.subjects.length === 0 && (
               <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
                 No subjects assigned to this class yet. Click "Add Subject" to configure subjects and periods.
               </div>
             )}
           </div>
         </>
-      ) : (
+      ) : activeSubTab === 'schedules' ? (
         /* Weekly Timetable Matrix View */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-[#003366] text-sm">Weekly Period Schedule Table: {activeClass.name}</h3>
+              <h3 className="font-bold text-[#003366] text-sm">Weekly Period Schedule Table: {activeClass?.name}</h3>
               <p className="text-xs text-gray-500">Auto-generated schedule based on configured periods per week</p>
             </div>
             <button
@@ -258,6 +294,54 @@ export const ManageSubjectsTab: React.FC<ManageSubjectsTabProps> = ({ appData, o
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : (
+        /* Teacher Period Allocation & Workload View */
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-bold text-[#003366] text-sm">Teacher Period Allocation &amp; Workload Matrix</h3>
+            <p className="text-xs text-gray-500">Monitor weekly teaching hours and period distributions across all campus teachers</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {teacherWorkloads.map(({ teacher, totalPeriods, assignedClassesDetails }) => {
+              const isOverloaded = totalPeriods > 25;
+              return (
+                <div key={teacher.id} className="p-5 rounded-2xl border border-gray-200 bg-gray-50/60 shadow-xs space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#003366] uppercase tracking-wide">
+                        {teacher.role.replace('_', ' ')}
+                      </span>
+                      <h4 className="font-black text-gray-900 text-sm mt-1">{teacher.name}</h4>
+                      <p className="text-xs text-gray-500">@{teacher.username}</p>
+                    </div>
+                    <div className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 ${
+                      isOverloaded ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{totalPeriods} Periods / Wk</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-200 space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-600 block">Assigned Teaching Load:</span>
+                    {assignedClassesDetails.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {assignedClassesDetails.map((item, idx) => (
+                          <span key={idx} className="bg-white border border-gray-200 px-2.5 py-1 rounded-xl text-xs text-gray-700 font-medium flex items-center gap-1">
+                            <span className="font-bold text-[#003366]">{item.className}:</span> {item.subjectName} ({item.periods}p)
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No periods allocated yet.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

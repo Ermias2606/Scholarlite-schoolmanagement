@@ -23,14 +23,15 @@ import {
 } from '../utils/calculations';
 import { StudentPerformanceSummaryView } from './StudentPerformanceSummaryView';
 import { ReportCardTemplate } from './ReportCardTemplate';
+import { GenderGradeDistributionView } from './GenderGradeDistributionView';
 
 interface ReportsViewProps {
   appData: AppData;
   activeClass: SchoolClass;
   selectedYear: string;
   selectedSemester: string;
-  reportType: 'summary' | 'student_performance_summary' | 'rank_list' | 'master_sheet' | 'performance' | 'report_card';
-  onSelectReportType: (type: 'summary' | 'student_performance_summary' | 'rank_list' | 'master_sheet' | 'performance' | 'report_card') => void;
+  reportType: 'summary' | 'student_performance_summary' | 'rank_list' | 'master_sheet' | 'performance' | 'report_card' | 'gender_distribution';
+  onSelectReportType: (type: 'summary' | 'student_performance_summary' | 'rank_list' | 'master_sheet' | 'performance' | 'report_card' | 'gender_distribution') => void;
   onEditRemarksAttendance?: (student: Student) => void;
 }
 
@@ -169,6 +170,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           { id: 'master_sheet', icon: '📑', label: 'Whole Term Master Sheet', activeColor: 'bg-[#00A896] text-white shadow-md' },
           { id: 'rank_list', icon: '📈', label: 'Cumulative Rank List', activeColor: 'bg-[#003366] text-white shadow-md' },
           { id: 'performance', icon: '📊', label: 'Performance Analysis', activeColor: 'bg-[#003366] text-white shadow-md' },
+          { id: 'gender_distribution', icon: '🚻', label: 'Gender Grade Distribution', activeColor: 'bg-[#003366] text-white shadow-md' },
           { id: 'report_card', icon: '🎓', label: 'Student Report Card', activeColor: 'bg-[#FFC300] text-[#003366] shadow-md ring-2 ring-[#FFC300]/50 ring-offset-1' }
         ].map((tab) => (
           <button
@@ -556,7 +558,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       )}
 
-      {/* 5. Student Report Card */}
+      {/* 5. Gender Grade Distribution View */}
+      {reportType === 'gender_distribution' && (
+        <GenderGradeDistributionView
+          appData={appData}
+          selectedYear={selectedYear}
+          selectedSemester={selectedSemester}
+        />
+      )}
+
+      {/* 6. Student Report Card */}
       {reportType === 'report_card' && (
         <div className="space-y-4 animate-in fade-in duration-150 relative">
           {/* Controls Bar */}
