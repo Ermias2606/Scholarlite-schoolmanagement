@@ -51,6 +51,7 @@ import { Calendar } from 'lucide-react';
 import { RoleSwitcherModal } from './components/RoleSwitcherModal';
 import { EditRemarksAttendanceModal } from './components/EditRemarksAttendanceModal';
 import { RegistrarTab } from './components/RegistrarTab';
+import { HcmTab } from './components/HcmTab';
 import { RoleTransitionLoader } from './components/RoleTransitionLoader';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { useTheme } from './utils/theme';
@@ -737,6 +738,7 @@ export default function App() {
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: Home, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
     { id: 'registrar', label: 'Registrar Office', icon: Building2, roles: ['super_admin', 'school_admin', 'admin'] },
+    { id: 'hcm', label: 'HCM (Human Capital)', icon: Users, roles: ['super_admin', 'school_admin', 'admin'] },
     { id: 'teacher_dashboard', label: 'Teacher Dashboard', icon: UserCheck, roles: ['class_teacher', 'subject_teacher'] },
     { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['super_admin', 'school_admin', 'admin', 'class_teacher', 'subject_teacher'] },
     { id: 'manage_classes', label: 'Classes', icon: Building2, roles: ['super_admin', 'school_admin', 'admin'] },
@@ -997,6 +999,15 @@ export default function App() {
                   <ManageStaffTab
                     appData={appData}
                     
+                    onUpdateUsers={(users) => {
+                      updateAppData((prev) => ({ ...prev, users }));
+                    }}
+                    onAddAuditLog={handleAddAuditLog}
+                  />
+                )}
+                {activeTab === 'hcm' && (
+                  <HcmTab
+                    appData={appData}
                     onUpdateUsers={(users) => {
                       updateAppData((prev) => ({ ...prev, users }));
                     }}

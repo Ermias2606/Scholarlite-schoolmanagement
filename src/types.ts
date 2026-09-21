@@ -64,7 +64,7 @@ export interface SchoolClass {
   students: Student[];
 }
 
-export type UserRole = 'super_admin' | 'school_admin' | 'admin' | 'class_teacher' | 'subject_teacher' | 'student';
+export type UserRole = 'super_admin' | 'school_admin' | 'admin' | 'class_teacher' | 'subject_teacher' | 'student' | 'department_head';
 
 export interface UserProfile {
   id: string;

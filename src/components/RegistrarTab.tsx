@@ -113,6 +113,12 @@ export const RegistrarTab: React.FC<RegistrarTabProps> = ({
   // Bulk Upload Modal
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
 
+  // Bulk Promotion/Transfer Wizard State
+  const [isBulkWizardOpen, setIsBulkWizardOpen] = useState(false);
+  const [bulkWizardActionType, setBulkWizardActionType] = useState<'migrate' | 'status'>('migrate');
+  const [bulkWizardTargetClassId, setBulkWizardTargetClassId] = useState<string>(appData.classes[0]?.id || '');
+  const [bulkWizardNewStatus, setBulkWizardNewStatus] = useState<'active' | 'graduated' | 'transferred' | 'suspended'>('active');
+
   // CSV File Input ref
   const csvInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -308,6 +314,59 @@ export const RegistrarTab: React.FC<RegistrarTabProps> = ({
       onUpdateStudent(classId, { id: studentId, studentStatus: newStatus });
     });
     onAddAuditLog('Bulk Status Update', `Updated status to "${newStatus}" for ${selectedStudentKeys.length} students`);
+    setSelectedStudentKeys([]);
+  };
+
+  // Bulk Promotion/Transfer Wizard Execution
+  const handleExecuteBulkWizard = () => {
+    if (selectedStudentKeys.length === 0) return;
+
+    if (bulkWizardActionType === 'migrate') {
+      if (!bulkWizardTargetClassId) {
+        alert('Please select a target destination class level.');
+        return;
+      }
+      const targetClass = appData.classes.find(c => c.id === bulkWizardTargetClassId);
+      if (!targetClass) return;
+
+      let successCount = 0;
+      selectedStudentKeys.forEach(key => {
+        const [sourceClassId, studentId] = key.split(':');
+        if (sourceClassId === bulkWizardTargetClassId) return;
+
+        const sourceClass = appData.classes.find(c => c.id === sourceClassId);
+        const student = sourceClass?.students.find(s => s.id === studentId);
+        if (!student) return;
+
+        const nextRollNo = targetClass.students.length > 0
+          ? Math.max(...targetClass.students.map(s => s.rollNo)) + 1 + successCount
+          : 1 + successCount;
+
+        onDeleteStudent(sourceClassId, studentId);
+        onAddStudent(bulkWizardTargetClassId, {
+          ...student,
+          rollNo: nextRollNo,
+          studentStatus: 'active',
+        });
+        successCount++;
+      });
+
+      onAddAuditLog(
+        'Bulk Promotion / Transfer Wizard',
+        `Successfully migrated ${successCount} students to class cohort ${targetClass.name}`
+      );
+    } else {
+      selectedStudentKeys.forEach(key => {
+        const [classId, studentId] = key.split(':');
+        onUpdateStudent(classId, { id: studentId, studentStatus: bulkWizardNewStatus });
+      });
+      onAddAuditLog(
+        'Bulk Status Update (Wizard)',
+        `Updated registry status to "${bulkWizardNewStatus}" for ${selectedStudentKeys.length} students`
+      );
+    }
+
+    setIsBulkWizardOpen(false);
     setSelectedStudentKeys([]);
   };
 
@@ -757,6 +816,13 @@ export const RegistrarTab: React.FC<RegistrarTabProps> = ({
                   className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg transition cursor-pointer"
                 >
                   Mark Transferred
+                </button>
+                <button
+                  onClick={() => setIsBulkWizardOpen(true)}
+                  className="px-3.5 py-1.5 bg-[#003366] hover:bg-[#002244] text-white font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>Bulk Promotion / Transfer Wizard</span>
                 </button>
                 <button
                   onClick={() => setSelectedStudentKeys([])}
@@ -2071,6 +2137,109 @@ export const RegistrarTab: React.FC<RegistrarTabProps> = ({
             onAddAuditLog('Bulk Student Enrolment', `Imported roster of ${students.length} students into class ID: ${classId}`);
           }}
         />
+      )}
+
+      {/* MODAL 8: BULK PROMOTION / TRANSFER WIZARD MODAL */}
+      {isBulkWizardOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-200">
+            <div className="flex items-center justify-between px-6 py-4 bg-[#003366] text-white">
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5" />
+                <h3 className="font-bold text-base">Bulk Promotion / Transfer Wizard</h3>
+              </div>
+              <button onClick={() => setIsBulkWizardOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs">
+              <div className="p-3 bg-blue-50 text-blue-900 rounded-xl font-medium border border-blue-200 flex items-center justify-between">
+                <span>Selected Students for Bulk Operation:</span>
+                <span className="font-bold text-sm bg-blue-600 text-white px-2.5 py-0.5 rounded-full">{selectedStudentKeys.length} Students</span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1.5">Select Bulk Action Type</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setBulkWizardActionType('migrate')}
+                    className={`py-3 px-4 rounded-xl font-bold border transition cursor-pointer text-left ${
+                      bulkWizardActionType === 'migrate'
+                        ? 'bg-[#003366] text-white border-[#003366] shadow-sm'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="text-sm font-black mb-0.5">Migrate / Promote Cohort</div>
+                    <div className="text-[11px] opacity-80">Move selected students to a new class level with auto roll numbering.</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkWizardActionType('status')}
+                    className={`py-3 px-4 rounded-xl font-bold border transition cursor-pointer text-left ${
+                      bulkWizardActionType === 'status'
+                        ? 'bg-[#003366] text-white border-[#003366] shadow-sm'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="text-sm font-black mb-0.5">Update Registry Status</div>
+                    <div className="text-[11px] opacity-80">Change status (active, graduated, transferred, suspended) in bulk.</div>
+                  </button>
+                </div>
+              </div>
+
+              {bulkWizardActionType === 'migrate' ? (
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1.5">Target Destination Class Cohort *</label>
+                  <select
+                    value={bulkWizardTargetClassId}
+                    onChange={(e) => setBulkWizardTargetClassId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-300 bg-white font-medium focus:ring-2 focus:ring-[#003366]"
+                  >
+                    <option value="">-- Choose Target Class --</option>
+                    {appData.classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} (Current Students: {c.students.length})</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-500 mt-1">Students will be removed from their current classes and added to the destination class with sequential roll numbers.</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1.5">New Registry Lifecycle Status *</label>
+                  <select
+                    value={bulkWizardNewStatus}
+                    onChange={(e) => setBulkWizardNewStatus(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-300 bg-white font-medium focus:ring-2 focus:ring-[#003366]"
+                  >
+                    <option value="active">Active Enrolled</option>
+                    <option value="graduated">Graduated</option>
+                    <option value="transferred">Transferred</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkWizardOpen(false)}
+                  className="px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteBulkWizard}
+                  className="px-6 py-2.5 rounded-xl bg-[#003366] hover:bg-[#002244] text-white font-bold shadow-md transition cursor-pointer"
+                >
+                  Execute Bulk Operation ({selectedStudentKeys.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

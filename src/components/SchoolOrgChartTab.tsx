@@ -251,20 +251,12 @@ export const SchoolOrgChartTab: React.FC<SchoolOrgChartTabProps> = ({
         <div>
           <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
             <Building2 className="w-6 h-6 text-[#00A896]" />
-            School Organizational Structure
+            School Organizational Structure &amp; Offices
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            Manage Director Office, Departments, and Component Offices seamlessly.
+            Manage Director Office, faculties, academic departments, and appoint leadership heads. (For staff creation &amp; HR profiles, use the HCM page).
           </p>
         </div>
-
-        <button
-          onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#00A896] hover:bg-[#008f80] text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Staff Member</span>
-        </button>
       </div>
 
       {/* Category Navigation Tabs */}
